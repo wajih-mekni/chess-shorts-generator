@@ -1,0 +1,249 @@
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+<meta charset="UTF-8">
+
+<title>Chess Animation</title>
+
+<style>
+
+body {
+    margin: 0;
+
+    background: #111;
+
+    height: 100vh;
+
+    display: flex;
+
+    justify-content: center;
+
+    align-items: center;
+}
+
+
+.board-container {
+
+    position: relative;
+
+    width: 800px;
+
+    height: 800px;
+
+}
+
+
+.board-background {
+
+    position: absolute;
+
+    width: 800px;
+
+    height: 800px;
+
+    left: 0;
+
+    top: 0;
+
+    z-index: 1;
+
+}
+
+
+.piece {
+
+    position: absolute;
+
+    width: 100px;
+
+    height: 100px;
+
+    z-index: 5;
+
+    transition:
+
+        left 0.55s cubic-bezier(.22,.61,.36,1),
+
+        top 0.55s cubic-bezier(.22,.61,.36,1);
+
+}
+
+
+.controls {
+
+    position: fixed;
+
+    bottom: 30px;
+
+    left: 50%;
+
+    transform: translateX(-50%);
+
+}
+
+
+button {
+
+    padding: 12px 24px;
+
+    font-size: 18px;
+
+    border: none;
+
+    border-radius: 8px;
+
+    cursor: pointer;
+
+}
+
+</style>
+
+</head>
+
+
+<body>
+
+
+<div class="board-container" id="board">
+
+    <img
+        class="board-background"
+        src="../assets/board.svg"
+    >
+
+</div>
+
+
+<div class="controls">
+
+<button onclick="playMove()">
+
+Play Move
+
+</button>
+
+</div>
+
+
+<script>
+
+const pieces = [{"square": "h8", "x": 7, "y": 0, "asset": "bR.svg"}, {"square": "g8", "x": 6, "y": 0, "asset": "bN.svg"}, {"square": "f8", "x": 5, "y": 0, "asset": "bB.svg"}, {"square": "e8", "x": 4, "y": 0, "asset": "bK.svg"}, {"square": "d8", "x": 3, "y": 0, "asset": "bQ.svg"}, {"square": "c8", "x": 2, "y": 0, "asset": "bB.svg"}, {"square": "b8", "x": 1, "y": 0, "asset": "bN.svg"}, {"square": "a8", "x": 0, "y": 0, "asset": "bR.svg"}, {"square": "h7", "x": 7, "y": 1, "asset": "bP.svg"}, {"square": "g7", "x": 6, "y": 1, "asset": "bP.svg"}, {"square": "f7", "x": 5, "y": 1, "asset": "bP.svg"}, {"square": "e7", "x": 4, "y": 1, "asset": "bP.svg"}, {"square": "d7", "x": 3, "y": 1, "asset": "bP.svg"}, {"square": "c7", "x": 2, "y": 1, "asset": "bP.svg"}, {"square": "b7", "x": 1, "y": 1, "asset": "bP.svg"}, {"square": "a7", "x": 0, "y": 1, "asset": "bP.svg"}, {"square": "h2", "x": 7, "y": 6, "asset": "wP.svg"}, {"square": "g2", "x": 6, "y": 6, "asset": "wP.svg"}, {"square": "f2", "x": 5, "y": 6, "asset": "wP.svg"}, {"square": "e2", "x": 4, "y": 6, "asset": "wP.svg"}, {"square": "d2", "x": 3, "y": 6, "asset": "wP.svg"}, {"square": "c2", "x": 2, "y": 6, "asset": "wP.svg"}, {"square": "b2", "x": 1, "y": 6, "asset": "wP.svg"}, {"square": "a2", "x": 0, "y": 6, "asset": "wP.svg"}, {"square": "h1", "x": 7, "y": 7, "asset": "wR.svg"}, {"square": "g1", "x": 6, "y": 7, "asset": "wN.svg"}, {"square": "f1", "x": 5, "y": 7, "asset": "wB.svg"}, {"square": "e1", "x": 4, "y": 7, "asset": "wK.svg"}, {"square": "d1", "x": 3, "y": 7, "asset": "wQ.svg"}, {"square": "c1", "x": 2, "y": 7, "asset": "wB.svg"}, {"square": "b1", "x": 1, "y": 7, "asset": "wN.svg"}, {"square": "a1", "x": 0, "y": 7, "asset": "wR.svg"}];
+
+const fromSquare = "e2";
+
+const toSquare = "e4";
+
+const board = document.getElementById("board");
+
+const squareSize = 100;
+
+
+
+function squareToCoords(square) {
+
+    const file =
+        square.charCodeAt(0)
+        -
+        "a".charCodeAt(0);
+
+    const rank =
+        8
+        -
+        parseInt(square[1]);
+
+    return {
+        x: file,
+        y: rank
+    };
+}
+
+
+
+let movingPiece = null;
+
+
+
+pieces.forEach(piece => {
+
+    const img =
+        document.createElement("img");
+
+    img.className = "piece";
+
+    img.src =
+        "../assets/pieces/"
+        +
+        piece.asset;
+
+    img.style.left =
+        (piece.x * squareSize)
+        +
+        "px";
+
+    img.style.top =
+        (piece.y * squareSize)
+        +
+        "px";
+
+    img.dataset.square =
+        piece.square;
+
+
+    if (
+        piece.square
+        ===
+        fromSquare
+    ) {
+
+        movingPiece = img;
+
+    }
+
+
+    board.appendChild(img);
+
+});
+
+
+
+function playMove() {
+
+    if (!movingPiece) return;
+
+
+    const target =
+        squareToCoords(
+            toSquare
+        );
+
+
+    movingPiece.style.left =
+        (
+            target.x
+            *
+            squareSize
+        )
+        +
+        "px";
+
+
+    movingPiece.style.top =
+        (
+            target.y
+            *
+            squareSize
+        )
+        +
+        "px";
+
+}
+
+</script>
+
+
+</body>
+
+</html>
