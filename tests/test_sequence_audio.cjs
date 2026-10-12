@@ -44,7 +44,7 @@ const sandbox = vm.createContext({
     assert, started, Element, console: { ...console, warn() {} },
     Audio, clearTimeout, setTimeout: (fn, ms) => ms === 500 ? fn() : setTimeout(fn, ms),
     document: {
-        getElementById: id => elements[id] ||= new Element(),
+        getElementById: id => ["memeVideo", "backgroundMusic"].includes(id) ? null : (elements[id] ||= new Element()),
         createElement: () => new Element()
     }
 });

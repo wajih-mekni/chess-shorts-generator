@@ -95,6 +95,21 @@ body {
 .from-highlight { opacity: 0.25; }
 .to-highlight { opacity: 0.46; }
 
+.check-target-layer {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    pointer-events: none;
+}
+
+.check-target {
+    position: absolute;
+    width: 135px;
+    height: 135px;
+    display: none;
+    background: #ff3b30;
+}
+
 .arrow-layer {
     position: absolute;
     inset: 0;
@@ -120,7 +135,7 @@ body {
     color: #fff;
     font-family: Arial, sans-serif;
     font-weight: 900;
-    font-size: 32px;
+    font-size: 30px;
     line-height: 1;
     letter-spacing: -2px;
     align-items: center;
@@ -131,18 +146,38 @@ body {
                 inset 0 1px 0 rgba(255, 255, 255, 0.25);
 }
 
-.brilliant { --annotation-color: #00bfc8; }
-.good { --annotation-color: #3280ff; }
-.interesting { --annotation-color: #28be5a; }
-.dubious { --annotation-color: #e6b41e; }
-.mistake { --annotation-color: #ff7828; }
-.blunder { --annotation-color: #e63232; }
+.annotation-pill {
+    position: absolute;
+    z-index: 9;
+    display: none;
+    box-sizing: border-box;
+    height: 46px;
+    padding: 0 16px;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 23px;
+    background: var(--annotation-color);
+    background: color-mix(in srgb, var(--annotation-color) 94%, transparent);
+    color: #fff;
+    font: 700 26px/1 Arial, sans-serif;
+    white-space: nowrap;
+    align-items: center;
+    pointer-events: none;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
+}
+
+.brilliant { --annotation-color: #26C2A3; }
+.great { --annotation-color: #4A90E2; }
+.excellent { --annotation-color: #7FAE3F; }
+.inaccuracy { --annotation-color: #E6B73C; }
+.mistake { --annotation-color: #F08A35; }
+.blunder { --annotation-color: #E04B4B; }
 
 
 /* Reaction / meme */
 .reaction-area {
     width: 1080px;
     height: 560px;
+    overflow: hidden;
 
     background: #181818;
 
@@ -155,6 +190,13 @@ body {
     color: #777;
 }
 
+
+.reaction-area video {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
 
 /* Play button only for development */
 .controls {
@@ -199,6 +241,7 @@ button {
 
             <div id="fromHighlight" class="move-highlight from-highlight" aria-hidden="true"></div>
             <div id="toHighlight" class="move-highlight to-highlight" aria-hidden="true"></div>
+            <div id="checkTargetLayer" class="check-target-layer" aria-hidden="true"></div>
             <svg id="arrowLayer" class="arrow-layer brilliant" viewBox="0 0 1080 1080" aria-hidden="true">
                 <defs>
                     <marker id="brilliantArrowhead" viewBox="0 0 48 48"
@@ -211,13 +254,14 @@ button {
                       stroke-linecap="round" marker-end="url(#brilliantArrowhead)" />
             </svg>
             <div id="annotationBadge" class="annotation-badge" aria-hidden="true"></div>
+            <div id="annotationPill" class="annotation-pill" aria-hidden="true"></div>
 
         </div>
 
     </div>
 
     <div class="reaction-area">
-        REACTION / MEME AREA
+        <video id="memeVideo" src="../assets/memes/reaction1.mp4" preload="auto" loop playsinline></video>
     </div>
 
 </div>
@@ -232,25 +276,82 @@ button {
 </div>
 
 
+<audio id="backgroundMusic" src="../assets/music/background.mp3" preload="auto" loop></audio>
+
 <script>
 
 const initialPieces = [{"square": "d8", "x": 3, "y": 0, "asset": "bQ.svg"}, {"square": "a8", "x": 0, "y": 0, "asset": "bK.svg"}, {"square": "b2", "x": 1, "y": 6, "asset": "bP.svg"}, {"square": "h1", "x": 7, "y": 7, "asset": "wR.svg"}, {"square": "e1", "x": 4, "y": 7, "asset": "wK.svg"}];
 
-const moves = [{"from": "e1", "to": "g1", "capture": null, "promotion": null, "rook_from": "h1", "rook_to": "f1", "annotation": "!!", "annotation_style": "brilliant", "check": false}, {"from": "b2", "to": "b1", "capture": null, "promotion": "bQ.svg", "rook_from": null, "rook_to": null, "annotation": "?", "annotation_style": "mistake", "check": false}, {"from": "f1", "to": "b1", "capture": "b1", "promotion": null, "rook_from": null, "rook_to": null, "annotation": "?!", "annotation_style": "dubious", "check": false}, {"from": "d8", "to": "d4", "capture": null, "promotion": null, "rook_from": null, "rook_to": null, "annotation": "!", "annotation_style": "good", "check": true}, {"from": "g1", "to": "h1", "capture": null, "promotion": null, "rook_from": null, "rook_to": null, "annotation": "??", "annotation_style": "blunder", "check": false}];
+const moves = [{"pause": 3.0, "from": "e1", "to": "g1", "capture": null, "promotion": null, "rook_from": "h1", "rook_to": "f1", "annotation": "!!", "annotation_style": "brilliant", "annotation_label": "Brilliant", "check": false, "check_targets": [], "check_paths": [], "checker_squares": [], "checked_king": null}, {"pause": 1.0, "from": "b2", "to": "b1", "capture": null, "promotion": "bQ.svg", "rook_from": null, "rook_to": null, "annotation": "?", "annotation_style": "mistake", "annotation_label": "Mistake", "check": false, "check_targets": [], "check_paths": [], "checker_squares": [], "checked_king": null}, {"pause": 0.7, "from": "f1", "to": "b1", "capture": "b1", "promotion": null, "rook_from": null, "rook_to": null, "annotation": "?!", "annotation_style": "inaccuracy", "annotation_label": "Inaccuracy", "check": false, "check_targets": [], "check_paths": [], "checker_squares": [], "checked_king": null}, {"pause": 4.0, "from": "d8", "to": "d4", "capture": null, "promotion": null, "rook_from": null, "rook_to": null, "annotation": "!", "annotation_style": "great", "annotation_label": "Great", "check": true, "check_targets": ["g1"], "check_paths": ["f2", "e3"], "checker_squares": ["d4"], "checked_king": "g1"}, {"pause": 0.7, "from": "g1", "to": "h1", "capture": null, "promotion": null, "rook_from": null, "rook_to": null, "annotation": "??", "annotation_style": "blunder", "annotation_label": "Blunder", "check": false, "check_targets": [], "check_paths": [], "checker_squares": [], "checked_king": null}, {"pause": 0.7, "from": "d4", "to": "e4", "capture": null, "promotion": null, "rook_from": null, "rook_to": null, "annotation": "!!", "annotation_style": "brilliant", "annotation_label": "Brilliant", "check": true, "check_targets": ["b1", "h1"], "check_paths": ["c2", "g2", "d3", "f3"], "checker_squares": ["e4"], "checked_king": "h1"}];
 
 const board = document.getElementById("board");
 
 const playButton = document.getElementById("playButton");
+const memeVideo = document.getElementById("memeVideo");
+
+function startMemeVideo() {
+    if (!memeVideo) return;
+    memeVideo.volume = 0.8;
+    memeVideo.muted = false;
+    memeVideo.currentTime = 0;
+    memeVideo.play().catch(error => {
+        console.warn("Could not play meme video:", error);
+    });
+}
+
+const backgroundMusic = document.getElementById("backgroundMusic");
+
+function startBackgroundMusic() {
+    if (!backgroundMusic) return;
+    backgroundMusic.volume = 0.12;
+    backgroundMusic.currentTime = 0;
+    backgroundMusic.play().catch(error => {
+        console.warn("Could not play background music:", error);
+    });
+}
 
 const squareSize = 135;
+const checkTargetLayer = document.getElementById("checkTargetLayer");
+// One reusable overlay per square; checking moves never create new nodes.
+const checkOverlays = Array.from({ length: 64 }, () => {
+    const overlay = document.createElement("div");
+    overlay.className = "check-target";
+    checkTargetLayer.appendChild(overlay);
+    return overlay;
+});
+
+function clearCheckEffects() {
+    checkOverlays.forEach(overlay => {
+        overlay.getAnimations().forEach(animation => animation.cancel());
+        overlay.style.display = "none";
+    });
+}
+
+function showCheckEffects(move) {
+    clearCheckEffects();
+    if (!move.check) return;
+    const targets = new Set(move.check_targets || []);
+    const squares = new Set([...(move.check_paths || []), ...targets]);
+    squares.forEach(square => {
+        const coords = squareToCoords(square);
+        const overlay = checkOverlays[coords.y * 8 + coords.x];
+        const opacity = square === move.checked_king ? 0.7
+            : targets.has(square) ? 0.55 : 0.32;
+        placePiece(overlay, square);
+        overlay.style.opacity = opacity;
+        overlay.style.display = "block";
+        overlay.animate([{ opacity: 0 }, { opacity }],
+            { duration: 180, easing: "ease-out" });
+    });
+}
+
 const fromHighlight = document.getElementById("fromHighlight");
 const toHighlight = document.getElementById("toHighlight");
 const arrowLayer = document.getElementById("arrowLayer");
 const brilliantArrow = document.getElementById("brilliantArrow");
 const annotationBadge = document.getElementById("annotationBadge");
-const effectElements = [fromHighlight, toHighlight, arrowLayer, annotationBadge];
-
-const pauseBetweenMoves = 500;
+const annotationPill = document.getElementById("annotationPill");
+const effectElements = [fromHighlight, toHighlight, arrowLayer, annotationBadge, annotationPill];
 
 
 let pieceBySquare = {};
@@ -382,20 +483,23 @@ function placePiece(element, square) {
 
 }
 
-function clearMoveEffects() {
+function clearMoveEffects(clearCheck = true) {
+
+    if (clearCheck) clearCheckEffects();
 
     effectElements.forEach(element => {
         element.getAnimations().forEach(animation => animation.cancel());
         element.style.display = "none";
     });
     annotationBadge.textContent = "";
+    annotationPill.textContent = "";
 
 }
 
 
 function showMoveEffects(move) {
 
-    clearMoveEffects();
+    clearMoveEffects(false);
     if (!move.annotation || !move.annotation_style) return;
 
     const from = squareToCoords(move.from);
@@ -427,10 +531,49 @@ function showMoveEffects(move) {
 
     annotationBadge.textContent = move.annotation;
     annotationBadge.className = "annotation-badge " + move.annotation_style;
-    // Inset enough to keep the badge and its pop inside every board edge.
-    annotationBadge.style.left = (to.x * squareSize + squareSize - 58 - 6) + "px";
-    annotationBadge.style.top = (to.y * squareSize + 6) + "px";
     annotationBadge.style.display = "flex";
+
+    annotationPill.className = "annotation-pill " + move.annotation_style;
+    annotationPill.textContent = move.annotation_label || "";
+    const hasLabel = Boolean(move.annotation_label);
+    annotationPill.style.display = hasLabel ? "flex" : "none";
+
+    // Measure the connected component before positioning it. Keep it outside
+    // near the top edge, with only a small part extending into the square.
+    const badgeWidth = annotationBadge.offsetWidth;
+    const badgeHeight = annotationBadge.offsetHeight;
+    const pillWidth = hasLabel ? annotationPill.offsetWidth : 0;
+    const pillHeight = hasLabel ? annotationPill.offsetHeight : 0;
+    const gap = hasLabel ? 2 : 0;
+    const edgeInset = 6; // Also leaves room for the badge's 1.1x pop.
+    const pieceGap = 4;
+    const componentWidth = pillWidth + gap + badgeWidth;
+    const componentHeight = Math.max(badgeHeight, pillHeight);
+    const boardSize = squareSize * 8;
+    const preferredRight = (to.x + 1) * squareSize - edgeInset;
+    const left = Math.max(edgeInset, Math.min(
+        preferredRight - componentWidth, boardSize - edgeInset - componentWidth));
+    const squareTop = to.y * squareSize;
+    // Let about one-third of the badge cross the square edge. The shorter
+    // pill extends less deeply, leaving the piece's crown clear.
+    const overlap = badgeHeight * 0.30;
+    const above = squareTop - componentHeight + overlap;
+    const top = above >= edgeInset ? above : Math.min(
+        squareTop + squareSize + pieceGap, boardSize - edgeInset - componentHeight);
+
+    annotationBadge.style.left = (left + pillWidth + gap) + "px";
+    annotationBadge.style.top = (top + (componentHeight - badgeHeight) / 2) + "px";
+    if (hasLabel) {
+        annotationPill.style.left = left + "px";
+        annotationPill.style.top = (top + (componentHeight - pillHeight) / 2) + "px";
+        annotationPill.style.transform = "none";
+        annotationPill.style.transformOrigin = "right center";
+        annotationPill.animate([
+            { transform: "scale(0.94)", opacity: 0 },
+            { transform: "scale(1)", opacity: 1 }
+        ], { duration: 200, easing: "ease-out" });
+    }
+
     annotationBadge.animate([
         { transform: "scale(0.7)", opacity: 0 },
         { transform: "scale(1.1)", opacity: 1, offset: 0.65 },
@@ -518,6 +661,7 @@ async function animateMove(move) {
     // Sound starts at the moving piece's actual landing, before any rook slide.
     await slidePieceToSquare(movingPiece, move.to);
     playMoveSound(move);
+    showCheckEffects(move);
 
 
     // Update mapping
@@ -576,7 +720,7 @@ async function animateMove(move) {
 
 
     await sleep(
-        pauseBetweenMoves
+        move.pause * 1000
     );
 
 }
@@ -591,6 +735,10 @@ async function playSequence() {
 
     playButton.disabled = true;
 
+    // Start with audio in the click gesture, before any asynchronous chess work.
+    // The media element runs independently of every per-move pause.
+    startMemeVideo();
+    startBackgroundMusic();
     await prepareMoveAudio();
 
     if (hasPlayed) {

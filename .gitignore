@@ -1,0 +1,6 @@
+# Local Python/export dependencies and generated capture artifacts
+.venv/
+__pycache__/
+*.pyc
+output/*.mp4
+output/*_export_logs/

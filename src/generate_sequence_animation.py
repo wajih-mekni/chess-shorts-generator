@@ -1,4 +1,5 @@
 import json
+from html import escape
 from pathlib import Path
 
 import chess
@@ -29,13 +30,13 @@ def piece_asset(piece: chess.Piece):
 
     return f"{color}{names[piece.piece_type]}.svg"
 
-ANNOTATION_STYLES = {
-    "!!": "brilliant",
-    "!": "good",
-    "!?": "interesting",
-    "?!": "dubious",
-    "?": "mistake",
-    "??": "blunder",
+ANNOTATIONS = {
+    "!!": {"style": "brilliant", "label": "Brilliant"},
+    "!": {"style": "great", "label": "Great"},
+    "!?": {"style": "excellent", "label": "Excellent"},
+    "?!": {"style": "inaccuracy", "label": "Inaccuracy"},
+    "?": {"style": "mistake", "label": "Mistake"},
+    "??": {"style": "blunder", "label": "Blunder"},
 }
 
 
@@ -62,11 +63,19 @@ def split_annotated_san(token: str):
 # Initial position + sequence
 # --------------------------------------------------
 
+MEME_PATH = "../assets/memes/reaction1.mp4"
+MEME_VOLUME = 0.8
+
+MUSIC_PATH = "../assets/music/background.mp3"
+MUSIC_VOLUME = 0.12
+
+DEFAULT_PAUSE = 0.7
+
 board = chess.Board(
     "k2q4/8/8/8/8/8/1p6/4K2R w K - 0 1"
 )
 
-annotated_line = "O-O!! b1=Q? Rxb1?! Qd4+! Kh1??"
+annotated_line = "O-O!!(3s) b1=Q?(1s) Rxb1?! Qd4+!(4s) Kh1?? Qe4!!"
 move_tokens = annotated_line.split()
 
 
@@ -102,6 +111,12 @@ temp_board = board.copy()
 
 for token in move_tokens:
 
+    pause = DEFAULT_PAUSE
+    timing = re.search(r"\((\d+(?:\.\d+)?)s\)$", token)
+    if timing:
+        pause = float(timing.group(1))
+        token = token[:timing.start()]
+
     san, annotation = split_annotated_san(token)
 
     move = temp_board.parse_san(san)
@@ -110,6 +125,7 @@ for token in move_tokens:
     to_square = chess.square_name(move.to_square)
 
     move_data = {
+        "pause": pause,
         "from": from_square,
         "to": to_square,
         "capture": None,
@@ -117,7 +133,8 @@ for token in move_tokens:
         "rook_from": None,
         "rook_to": None,
         "annotation": annotation,
-        "annotation_style": ANNOTATION_STYLES.get(annotation),
+        "annotation_style": ANNOTATIONS.get(annotation, {}).get("style"),
+        "annotation_label": ANNOTATIONS.get(annotation, {}).get("label"),
     }
 
     # Normal capture
@@ -145,6 +162,31 @@ for token in move_tokens:
 
     temp_board.push(move)
     move_data["check"] = temp_board.is_check()
+    move_data["check_targets"] = []
+    move_data["check_paths"] = []
+    move_data["checker_squares"] = []
+    move_data["checked_king"] = None
+    if move_data["check"]:
+        checkers = temp_board.checkers()
+        king = temp_board.king(temp_board.turn)
+        targets = {king}
+        paths = set()
+        for checker in checkers:
+            checker_targets = {
+                square for square in temp_board.attacks(checker)
+                if temp_board.color_at(square) == temp_board.turn
+            }
+            targets.update(checker_targets)
+            if temp_board.piece_type_at(checker) in (chess.ROOK, chess.BISHOP, chess.QUEEN):
+                for target in checker_targets:
+                    paths.update(chess.SquareSet(chess.between(checker, target)))
+        move_data["check_paths"] = [
+            chess.square_name(square) for square in sorted(paths - targets)
+            if temp_board.piece_at(square) is None
+        ]
+        move_data["check_targets"] = [chess.square_name(square) for square in sorted(targets)]
+        move_data["checker_squares"] = [chess.square_name(square) for square in checkers]
+        move_data["checked_king"] = chess.square_name(king)
 
     # Promotion
     if move.promotion:
@@ -153,6 +195,18 @@ for token in move_tokens:
 
     moves.append(move_data)
 
+
+meme_video = (
+    f'<video id="memeVideo" src="{escape(MEME_PATH, quote=True)}" '
+    'preload="auto" loop playsinline></video>'
+    if MEME_PATH else ""
+)
+
+music_audio = (
+    f'<audio id="backgroundMusic" src="{escape(MUSIC_PATH, quote=True)}" '
+    'preload="auto" loop></audio>'
+    if MUSIC_PATH else ""
+)
 
 html = f"""
 <!DOCTYPE html>
@@ -251,6 +305,21 @@ body {{
 .from-highlight {{ opacity: 0.25; }}
 .to-highlight {{ opacity: 0.46; }}
 
+.check-target-layer {{
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    pointer-events: none;
+}}
+
+.check-target {{
+    position: absolute;
+    width: 135px;
+    height: 135px;
+    display: none;
+    background: #ff3b30;
+}}
+
 .arrow-layer {{
     position: absolute;
     inset: 0;
@@ -276,7 +345,7 @@ body {{
     color: #fff;
     font-family: Arial, sans-serif;
     font-weight: 900;
-    font-size: 32px;
+    font-size: 30px;
     line-height: 1;
     letter-spacing: -2px;
     align-items: center;
@@ -287,18 +356,38 @@ body {{
                 inset 0 1px 0 rgba(255, 255, 255, 0.25);
 }}
 
-.brilliant {{ --annotation-color: #00bfc8; }}
-.good {{ --annotation-color: #3280ff; }}
-.interesting {{ --annotation-color: #28be5a; }}
-.dubious {{ --annotation-color: #e6b41e; }}
-.mistake {{ --annotation-color: #ff7828; }}
-.blunder {{ --annotation-color: #e63232; }}
+.annotation-pill {{
+    position: absolute;
+    z-index: 9;
+    display: none;
+    box-sizing: border-box;
+    height: 46px;
+    padding: 0 16px;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 23px;
+    background: var(--annotation-color);
+    background: color-mix(in srgb, var(--annotation-color) 94%, transparent);
+    color: #fff;
+    font: 700 26px/1 Arial, sans-serif;
+    white-space: nowrap;
+    align-items: center;
+    pointer-events: none;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
+}}
+
+.brilliant {{ --annotation-color: #26C2A3; }}
+.great {{ --annotation-color: #4A90E2; }}
+.excellent {{ --annotation-color: #7FAE3F; }}
+.inaccuracy {{ --annotation-color: #E6B73C; }}
+.mistake {{ --annotation-color: #F08A35; }}
+.blunder {{ --annotation-color: #E04B4B; }}
 
 
 /* Reaction / meme */
 .reaction-area {{
     width: 1080px;
     height: 560px;
+    overflow: hidden;
 
     background: #181818;
 
@@ -311,6 +400,13 @@ body {{
     color: #777;
 }}
 
+
+.reaction-area video {{
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}}
 
 /* Play button only for development */
 .controls {{
@@ -355,6 +451,7 @@ button {{
 
             <div id="fromHighlight" class="move-highlight from-highlight" aria-hidden="true"></div>
             <div id="toHighlight" class="move-highlight to-highlight" aria-hidden="true"></div>
+            <div id="checkTargetLayer" class="check-target-layer" aria-hidden="true"></div>
             <svg id="arrowLayer" class="arrow-layer brilliant" viewBox="0 0 1080 1080" aria-hidden="true">
                 <defs>
                     <marker id="brilliantArrowhead" viewBox="0 0 48 48"
@@ -367,13 +464,14 @@ button {{
                       stroke-linecap="round" marker-end="url(#brilliantArrowhead)" />
             </svg>
             <div id="annotationBadge" class="annotation-badge" aria-hidden="true"></div>
+            <div id="annotationPill" class="annotation-pill" aria-hidden="true"></div>
 
         </div>
 
     </div>
 
     <div class="reaction-area">
-        REACTION / MEME AREA
+        {meme_video}
     </div>
 
 </div>
@@ -388,6 +486,8 @@ button {{
 </div>
 
 
+{music_audio}
+
 <script>
 
 const initialPieces = {json.dumps(pieces)};
@@ -397,16 +497,71 @@ const moves = {json.dumps(moves)};
 const board = document.getElementById("board");
 
 const playButton = document.getElementById("playButton");
+const memeVideo = document.getElementById("memeVideo");
+
+function startMemeVideo() {{
+    if (!memeVideo) return;
+    memeVideo.volume = {json.dumps(MEME_VOLUME)};
+    memeVideo.muted = false;
+    memeVideo.currentTime = 0;
+    memeVideo.play().catch(error => {{
+        console.warn("Could not play meme video:", error);
+    }});
+}}
+
+const backgroundMusic = document.getElementById("backgroundMusic");
+
+function startBackgroundMusic() {{
+    if (!backgroundMusic) return;
+    backgroundMusic.volume = {json.dumps(MUSIC_VOLUME)};
+    backgroundMusic.currentTime = 0;
+    backgroundMusic.play().catch(error => {{
+        console.warn("Could not play background music:", error);
+    }});
+}}
 
 const squareSize = 135;
+const checkTargetLayer = document.getElementById("checkTargetLayer");
+// One reusable overlay per square; checking moves never create new nodes.
+const checkOverlays = Array.from({{ length: 64 }}, () => {{
+    const overlay = document.createElement("div");
+    overlay.className = "check-target";
+    checkTargetLayer.appendChild(overlay);
+    return overlay;
+}});
+
+function clearCheckEffects() {{
+    checkOverlays.forEach(overlay => {{
+        overlay.getAnimations().forEach(animation => animation.cancel());
+        overlay.style.display = "none";
+    }});
+}}
+
+function showCheckEffects(move) {{
+    clearCheckEffects();
+    if (!move.check) return;
+    const targets = new Set(move.check_targets || []);
+    const squares = new Set([...(move.check_paths || []), ...targets]);
+    squares.forEach(square => {{
+        const coords = squareToCoords(square);
+        const overlay = checkOverlays[coords.y * 8 + coords.x];
+        const opacity = square === move.checked_king ? 0.7
+            : targets.has(square) ? 0.55 : 0.32;
+        placePiece(overlay, square);
+        overlay.style.opacity = opacity;
+        overlay.style.display = "block";
+        overlay.animate([{{ opacity: 0 }}, {{ opacity }}],
+            {{ duration: 180, easing: "ease-out" }});
+    }});
+}}
+
 const fromHighlight = document.getElementById("fromHighlight");
 const toHighlight = document.getElementById("toHighlight");
 const arrowLayer = document.getElementById("arrowLayer");
 const brilliantArrow = document.getElementById("brilliantArrow");
 const annotationBadge = document.getElementById("annotationBadge");
-const effectElements = [fromHighlight, toHighlight, arrowLayer, annotationBadge];
-
-const pauseBetweenMoves = 500;
+const annotationPill = document.getElementById("annotationPill");
+const effectElements = [fromHighlight, toHighlight, arrowLayer, annotationBadge, annotationPill];
 
 
 let pieceBySquare = {{}};
@@ -538,20 +693,23 @@ function placePiece(element, square) {{
 
 }}
 
-function clearMoveEffects() {{
+function clearMoveEffects(clearCheck = true) {{
+
+    if (clearCheck) clearCheckEffects();
 
     effectElements.forEach(element => {{
         element.getAnimations().forEach(animation => animation.cancel());
         element.style.display = "none";
     }});
     annotationBadge.textContent = "";
+    annotationPill.textContent = "";
 
 }}
 
 
 function showMoveEffects(move) {{
 
-    clearMoveEffects();
+    clearMoveEffects(false);
     if (!move.annotation || !move.annotation_style) return;
 
     const from = squareToCoords(move.from);
@@ -583,10 +741,49 @@ function showMoveEffects(move) {{
 
     annotationBadge.textContent = move.annotation;
     annotationBadge.className = "annotation-badge " + move.annotation_style;
-    // Inset enough to keep the badge and its pop inside every board edge.
-    annotationBadge.style.left = (to.x * squareSize + squareSize - 58 - 6) + "px";
-    annotationBadge.style.top = (to.y * squareSize + 6) + "px";
     annotationBadge.style.display = "flex";
+
+    annotationPill.className = "annotation-pill " + move.annotation_style;
+    annotationPill.textContent = move.annotation_label || "";
+    const hasLabel = Boolean(move.annotation_label);
+    annotationPill.style.display = hasLabel ? "flex" : "none";
+
+    // Measure the connected component before positioning it. Keep it outside
+    // near the top edge, with only a small part extending into the square.
+    const badgeWidth = annotationBadge.offsetWidth;
+    const badgeHeight = annotationBadge.offsetHeight;
+    const pillWidth = hasLabel ? annotationPill.offsetWidth : 0;
+    const pillHeight = hasLabel ? annotationPill.offsetHeight : 0;
+    const gap = hasLabel ? 2 : 0;
+    const edgeInset = 6; // Also leaves room for the badge's 1.1x pop.
+    const pieceGap = 4;
+    const componentWidth = pillWidth + gap + badgeWidth;
+    const componentHeight = Math.max(badgeHeight, pillHeight);
+    const boardSize = squareSize * 8;
+    const preferredRight = (to.x + 1) * squareSize - edgeInset;
+    const left = Math.max(edgeInset, Math.min(
+        preferredRight - componentWidth, boardSize - edgeInset - componentWidth));
+    const squareTop = to.y * squareSize;
+    // Let about one-third of the badge cross the square edge. The shorter
+    // pill extends less deeply, leaving the piece's crown clear.
+    const overlap = badgeHeight * 0.30;
+    const above = squareTop - componentHeight + overlap;
+    const top = above >= edgeInset ? above : Math.min(
+        squareTop + squareSize + pieceGap, boardSize - edgeInset - componentHeight);
+
+    annotationBadge.style.left = (left + pillWidth + gap) + "px";
+    annotationBadge.style.top = (top + (componentHeight - badgeHeight) / 2) + "px";
+    if (hasLabel) {{
+        annotationPill.style.left = left + "px";
+        annotationPill.style.top = (top + (componentHeight - pillHeight) / 2) + "px";
+        annotationPill.style.transform = "none";
+        annotationPill.style.transformOrigin = "right center";
+        annotationPill.animate([
+            {{ transform: "scale(0.94)", opacity: 0 }},
+            {{ transform: "scale(1)", opacity: 1 }}
+        ], {{ duration: 200, easing: "ease-out" }});
+    }}
+
     annotationBadge.animate([
         {{ transform: "scale(0.7)", opacity: 0 }},
         {{ transform: "scale(1.1)", opacity: 1, offset: 0.65 }},
@@ -674,6 +871,7 @@ async function animateMove(move) {{
     // Sound starts at the moving piece's actual landing, before any rook slide.
     await slidePieceToSquare(movingPiece, move.to);
     playMoveSound(move);
+    showCheckEffects(move);
 
 
     // Update mapping
@@ -732,7 +930,7 @@ async function animateMove(move) {{
 
 
     await sleep(
-        pauseBetweenMoves
+        move.pause * 1000
     );
 
 }}
@@ -747,6 +945,10 @@ async function playSequence() {{
 
     playButton.disabled = true;
 
+    // Start with audio in the click gesture, before any asynchronous chess work.
+    // The media element runs independently of every per-move pause.
+    startMemeVideo();
+    startBackgroundMusic();
     await prepareMoveAudio();
 
     if (hasPlayed) {{
