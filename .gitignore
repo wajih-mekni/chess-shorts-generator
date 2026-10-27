@@ -4,3 +4,12 @@ __pycache__/
 *.pyc
 output/*.mp4
 output/*_export_logs/
+
+# Generated videos
+*.mp4
+
+# Generated output
+output/
+
+# Temporary files
+/com.png

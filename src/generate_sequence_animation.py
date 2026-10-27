@@ -6,6 +6,29 @@ import chess
 import re
 
 
+# Final composition in output pixels. Board internals retain one logical coordinate
+# system so pieces, arrows, highlights and animation distances scale together.
+CANVAS_WIDTH = 1080
+CANVAS_HEIGHT = 1920
+TOP_SAFE_AREA = 150
+BOTTOM_SAFE_AREA = 280
+BOARD_SIZE = 960
+FRAME_PADDING = 30
+BOARD_FRAME_SIZE = BOARD_SIZE + 2 * FRAME_PADDING
+FRAME_X = (CANVAS_WIDTH - BOARD_FRAME_SIZE) / 2
+FRAME_Y = TOP_SAFE_AREA
+BOARD_X = FRAME_X + FRAME_PADDING
+BOARD_Y = FRAME_Y + FRAME_PADDING
+BOARD_LOGICAL_SIZE = 1080
+BOARD_SCALE = BOARD_SIZE / BOARD_LOGICAL_SIZE
+MEME_WIDTH = 980
+MEME_X = (CANVAS_WIDTH - MEME_WIDTH) / 2
+MEME_Y = FRAME_Y + BOARD_FRAME_SIZE + 30
+MEME_HEIGHT = CANVAS_HEIGHT - BOTTOM_SAFE_AREA - MEME_Y
+RIGHT_UI_SAFE_AREA = 150
+# Contain preserves faces/text for any source aspect ratio without guessing a crop.
+MEME_FIT = "contain"
+
 OUTPUT_PATH = Path("output/sequence_demo.html")
 OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
 
@@ -59,23 +82,45 @@ def split_annotated_san(token: str):
     return san, annotation
 
 
+def parse_move_token(token: str, default_pause: float):
+    """Separate SAN from annotations and trailing timing/meme metadata."""
+    pause = None
+    start_meme = False
+    while True:
+        metadata = re.search(r"\((meme|\d+(?:\.\d+)?s)\)$", token)
+        if metadata is None:
+            break
+        value = metadata.group(1)
+        if value == "meme":
+            start_meme = True
+        elif pause is None:
+            pause = float(value[:-1])
+        token = token[:metadata.start()]
+
+    san, annotation = split_annotated_san(token)
+    return san, annotation, default_pause if pause is None else pause, start_meme
+
+
 # --------------------------------------------------
 # Initial position + sequence
 # --------------------------------------------------
 
-MEME_PATH = "../assets/memes/reaction1.mp4"
-MEME_VOLUME = 0.8
+MEME_PATH = "../assets/memes/MonkeyCry.mp4"
+MEME_VOLUME = 0.25
+# Set to None or "" to hide the reaction caption.
+MEME_COMMENT = "💀 Black after this move 💀 "
+# 💀🔥💀🔥💀🔥
 
-MUSIC_PATH = "../assets/music/background.mp3"
-MUSIC_VOLUME = 0.12
+MUSIC_PATH = None
+MUSIC_VOLUME = 0.8
 
-DEFAULT_PAUSE = 0.7
+DEFAULT_PAUSE = 2
 
 board = chess.Board(
-    "k2q4/8/8/8/8/8/1p6/4K2R w K - 0 1"
+    "r4rk1/1b1R3p/p1p1p3/Pp2Bp1q/nb2nQ2/7P/1P3PP1/6K1 w - - 0 1"
 )
 
-annotated_line = "O-O!!(3s) b1=Q?(1s) Rxb1?! Qd4+!(4s) Kh1?? Qe4!!"
+annotated_line = "Qg3!!(5s) "
 move_tokens = annotated_line.split()
 
 
@@ -109,15 +154,15 @@ moves = []
 
 temp_board = board.copy()
 
+timeline = []
+
 for token in move_tokens:
 
-    pause = DEFAULT_PAUSE
-    timing = re.search(r"\((\d+(?:\.\d+)?)s\)$", token)
-    if timing:
-        pause = float(timing.group(1))
-        token = token[:timing.start()]
+    if token == "(meme)":
+        timeline.append({"type": "meme"})
+        continue
 
-    san, annotation = split_annotated_san(token)
+    san, annotation, pause, start_meme = parse_move_token(token, DEFAULT_PAUSE)
 
     move = temp_board.parse_san(san)
 
@@ -126,6 +171,7 @@ for token in move_tokens:
 
     move_data = {
         "pause": pause,
+        "start_meme": start_meme,
         "from": from_square,
         "to": to_square,
         "capture": None,
@@ -194,12 +240,18 @@ for token in move_tokens:
         move_data["promotion"] = piece_asset(promoted_piece)
 
     moves.append(move_data)
+    timeline.append({"type": "move", "move": move_data})
 
 
 meme_video = (
     f'<video id="memeVideo" src="{escape(MEME_PATH, quote=True)}" '
     'preload="auto" loop playsinline></video>'
     if MEME_PATH else ""
+)
+
+meme_comment = (
+    f'<div class="meme-comment">{escape(MEME_COMMENT)}</div>'
+    if MEME_COMMENT else ""
 )
 
 music_audio = (
@@ -236,10 +288,11 @@ body {{
 .short-canvas {{
     position: relative;
 
-    width: 1080px;
-    height: 1920px;
+    width: {CANVAS_WIDTH}px;
+    height: {CANVAS_HEIGHT}px;
+    flex-shrink: 0;
 
-    background: #111;
+    background: linear-gradient(155deg, #f2e4ce 0%, #d9bb92 65%, #c8a57e 100%);
 
     overflow: hidden;
 }}
@@ -247,30 +300,34 @@ body {{
 
 /* Chess board section */
 .board-area {{
-    position: relative;
-
-    width: 1080px;
-    height: 1080px;
-
-    display: flex;
-    justify-content: center;
-    align-items: flex-start;
+    position: absolute;
+    left: {FRAME_X}px;
+    top: {FRAME_Y}px;
+    width: {BOARD_FRAME_SIZE}px;
+    height: {BOARD_FRAME_SIZE}px;
+    box-sizing: border-box;
+    border-radius: 22px;
+    background: linear-gradient(145deg, #fff1da, #dcb98a);
+    box-shadow: 0 12px 28px rgba(91, 57, 25, 0.18),
+                inset 0 0 0 2px rgba(255, 255, 255, 0.55);
 }}
 
-
 .board-container {{
-    position: relative;
-
-    width: 1080px;
-    height: 1080px;
+    position: absolute;
+    left: {FRAME_PADDING}px;
+    top: {FRAME_PADDING}px;
+    width: {BOARD_LOGICAL_SIZE}px;
+    height: {BOARD_LOGICAL_SIZE}px;
+    transform: scale({BOARD_SCALE});
+    transform-origin: top left;
 }}
 
 
 .board-background {{
     position: absolute;
 
-    width: 1080px;
-    height: 1080px;
+    width: {BOARD_LOGICAL_SIZE}px;
+    height: {BOARD_LOGICAL_SIZE}px;
 
     left: 0;
     top: 0;
@@ -282,8 +339,8 @@ body {{
 .piece {{
     position: absolute;
 
-    width: 135px;
-    height: 135px;
+    width: {BOARD_LOGICAL_SIZE / 8}px;
+    height: {BOARD_LOGICAL_SIZE / 8}px;
 
     z-index: 5;
 
@@ -294,8 +351,8 @@ body {{
 /* Effects use one shared color, with independent layer opacity. */
 .move-highlight {{
     position: absolute;
-    width: 135px;
-    height: 135px;
+    width: {BOARD_LOGICAL_SIZE / 8}px;
+    height: {BOARD_LOGICAL_SIZE / 8}px;
     z-index: 3;
     display: none;
     pointer-events: none;
@@ -314,8 +371,8 @@ body {{
 
 .check-target {{
     position: absolute;
-    width: 135px;
-    height: 135px;
+    width: {BOARD_LOGICAL_SIZE / 8}px;
+    height: {BOARD_LOGICAL_SIZE / 8}px;
     display: none;
     background: #ff3b30;
 }}
@@ -323,8 +380,8 @@ body {{
 .arrow-layer {{
     position: absolute;
     inset: 0;
-    width: 1080px;
-    height: 1080px;
+    width: {BOARD_LOGICAL_SIZE}px;
+    height: {BOARD_LOGICAL_SIZE}px;
     z-index: 4;
     display: none;
     pointer-events: none;
@@ -385,11 +442,16 @@ body {{
 
 /* Reaction / meme */
 .reaction-area {{
-    width: 1080px;
-    height: 560px;
+    position: absolute;
+    left: {MEME_X}px;
+    top: {MEME_Y}px;
+    width: {MEME_WIDTH}px;
+    height: {MEME_HEIGHT}px;
+    border-radius: 18px;
+    box-shadow: 0 8px 24px rgba(91, 57, 25, 0.16);
     overflow: hidden;
 
-    background: #181818;
+    background: #c5a780;
 
     display: flex;
     justify-content: center;
@@ -405,7 +467,27 @@ body {{
     display: block;
     width: 100%;
     height: 100%;
-    object-fit: cover;
+    object-fit: {MEME_FIT};
+}}
+
+.meme-comment {{
+    position: absolute;
+    top: 24px;
+    left: 24px;
+    right: {max(24, MEME_X + MEME_WIDTH - (CANVAS_WIDTH - RIGHT_UI_SAFE_AREA))}px;
+    z-index: 10;
+    width: auto;
+    box-sizing: border-box;
+    padding: 12px 20px;
+    border-radius: 14px;
+    background: rgba(0, 0, 0, 0.72);
+    color: #fff;
+    font: 700 36px/1.25 Arial, sans-serif;
+    text-align: center;
+    overflow-wrap: anywhere;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+    pointer-events: none;
 }}
 
 /* Play button only for development */
@@ -452,7 +534,7 @@ button {{
             <div id="fromHighlight" class="move-highlight from-highlight" aria-hidden="true"></div>
             <div id="toHighlight" class="move-highlight to-highlight" aria-hidden="true"></div>
             <div id="checkTargetLayer" class="check-target-layer" aria-hidden="true"></div>
-            <svg id="arrowLayer" class="arrow-layer brilliant" viewBox="0 0 1080 1080" aria-hidden="true">
+            <svg id="arrowLayer" class="arrow-layer brilliant" viewBox="0 0 {BOARD_LOGICAL_SIZE} {BOARD_LOGICAL_SIZE}" aria-hidden="true">
                 <defs>
                     <marker id="brilliantArrowhead" viewBox="0 0 48 48"
                             markerWidth="48" markerHeight="48" refX="46" refY="24"
@@ -472,6 +554,7 @@ button {{
 
     <div class="reaction-area">
         {meme_video}
+        {meme_comment}
     </div>
 
 </div>
@@ -493,14 +576,43 @@ button {{
 const initialPieces = {json.dumps(pieces)};
 
 const moves = {json.dumps(moves)};
+const timeline = {json.dumps(timeline)};
+const hasMemeTriggers = timeline.some(event =>
+    event.type === "meme" || event.move?.start_meme);
 
 const board = document.getElementById("board");
 
 const playButton = document.getElementById("playButton");
 const memeVideo = document.getElementById("memeVideo");
 
-function startMemeVideo() {{
+let memeStarted = false;
+
+async function prepareDelayedMeme() {{
     if (!memeVideo) return;
+    // Prime playback in the Play gesture without emitting audio, then freeze
+    // the first decoded frame. Later timeline triggers can play with audio.
+    memeVideo.pause();
+    memeVideo.currentTime = 0;
+    memeVideo.muted = true;
+    try {{
+        await memeVideo.play();
+    }} catch (error) {{
+        console.warn("Could not prepare meme video:", error);
+    }} finally {{
+        memeVideo.pause();
+        memeVideo.currentTime = 0;
+        memeVideo.volume = {json.dumps(MEME_VOLUME)};
+        memeVideo.muted = false;
+    }}
+    if (memeVideo.seeking) {{
+        await new Promise(resolve =>
+            memeVideo.addEventListener("seeked", resolve, {{ once: true }}));
+    }}
+}}
+
+function startMemeVideo() {{
+    if (!memeVideo || memeStarted) return;
+    memeStarted = true;
     memeVideo.volume = {json.dumps(MEME_VOLUME)};
     memeVideo.muted = false;
     memeVideo.currentTime = 0;
@@ -520,7 +632,7 @@ function startBackgroundMusic() {{
     }});
 }}
 
-const squareSize = 135;
+const squareSize = {BOARD_LOGICAL_SIZE / 8};
 const checkTargetLayer = document.getElementById("checkTargetLayer");
 // One reusable overlay per square; checking moves never create new nodes.
 const checkOverlays = Array.from({{ length: 64 }}, () => {{
@@ -762,7 +874,7 @@ function showMoveEffects(move) {{
     const boardSize = squareSize * 8;
     const preferredRight = (to.x + 1) * squareSize - edgeInset;
     const left = Math.max(edgeInset, Math.min(
-        preferredRight - componentWidth, boardSize - edgeInset - componentWidth));
+        preferredRight - componentWidth, {(CANVAS_WIDTH - RIGHT_UI_SAFE_AREA - BOARD_X) / BOARD_SCALE} - edgeInset - componentWidth));
     const squareTop = to.y * squareSize;
     // Let about one-third of the badge cross the square edge. The shorter
     // pill extends less deeply, leaving the piece's crown clear.
@@ -872,6 +984,7 @@ async function animateMove(move) {{
     await slidePieceToSquare(movingPiece, move.to);
     playMoveSound(move);
     showCheckEffects(move);
+    if (move.start_meme) startMemeVideo();
 
 
     // Update mapping
@@ -947,9 +1060,11 @@ async function playSequence() {{
 
     // Start with audio in the click gesture, before any asynchronous chess work.
     // The media element runs independently of every per-move pause.
-    startMemeVideo();
+    memeStarted = false;
+    const memeReady = hasMemeTriggers ? prepareDelayedMeme() : null;
+    if (!hasMemeTriggers) startMemeVideo();
     startBackgroundMusic();
-    await prepareMoveAudio();
+    await Promise.all([prepareMoveAudio(), memeReady]);
 
     if (hasPlayed) {{
         clearMoveEffects();
@@ -958,12 +1073,12 @@ async function playSequence() {{
         createPieces();
     }}
 
-    for (const move of moves) {{
-
-        await animateMove(
-            move
-        );
-
+    for (const event of timeline) {{
+        if (event.type === "meme") {{
+            startMemeVideo();
+        }} else {{
+            await animateMove(event.move);
+        }}
     }}
 
 

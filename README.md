@@ -14,6 +14,27 @@ python src/generate_sequence_animation.py
 Open `output/sequence_demo.html` and click Play Sequence. The export step does
 not replace or edit this file.
 
+## Trigger the reaction video from moves
+
+Add `(meme)` to the annotated sequence to choose when the reaction video starts:
+
+```text
+(meme) e4(1s) e5(1s) Nf3
+e4(1s) e5(1s) (meme) Nf3
+e4(1s) e5!!(meme)(3s) Nf3
+```
+
+A standalone `(meme)` runs between moves, **after the previous move's pause**.
+An attached `(meme)` runs **when that move lands**, before its pause. Keep the
+pause suffix last, as in `e5!!(meme)(3s)`. Neither form adds a delay.
+
+When a trigger is present, the video waits on its first frame with no audible
+meme audio. Once triggered, it plays and loops independently of chess timing.
+Repeated triggers are ignored until Replay Sequence resets playback. With no
+`(meme)` in the sequence, the video starts immediately as before. Music and
+chess sounds keep their existing behavior. If no meme file is configured,
+triggers do nothing. The HTML preview and MP4 exporter use the same timeline.
+
 ## Video export setup (Ubuntu)
 
 FFmpeg needs the `x11grab` and `pulse` input devices and the `libx264` encoder
@@ -145,3 +166,17 @@ checks three distinct tones in the captured audio (meme, music, and a one-shot
 SFX), continuous playback across pauses/loops, and video/audio timing using a
 color change. Test media and output are temporary; your puzzle and assets are
 untouched.
+
+## Shorts composition
+
+Layout settings live together at the top of `src/generate_sequence_animation.py`.
+The 1080×1920 canvas uses a 960px board at (60, 180), inside a 1020px
+warm frame starting at y=150. The 980×440 reaction panel begins at (50, 1200),
+leaving 280px below it. `MEME_FIT = "contain"` preserves the whole source image
+with warm padding when aspect ratios differ. Board pieces and all effects share
+one scaled coordinate system. `RIGHT_UI_SAFE_AREA` moves annotation labels and
+caption text inward; actual YouTube overlays vary by device and can still cover
+part of the rightmost file on a centered board of this size.
+
+Regenerate the HTML after changing these settings. `output/layout_preview.png`
+is a single representative frame of the updated composition.
