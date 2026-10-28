@@ -1,31 +1,20 @@
 """Run with: python -m unittest discover -s tests -p test_move_token_parser.py"""
-import ast
-from contextlib import redirect_stdout
-from io import StringIO
 from pathlib import Path
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
-
 import chess
 
-
-SOURCE = Path(__file__).resolve().parents[1] / 'src/generate_sequence_animation.py'
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from src.renderer.chess_state import compile_sequence, parse_move_token
 
 
 def generate(output, line=None):
-    tree = ast.parse(SOURCE.read_text())
-    for node in tree.body:
-        if isinstance(node, ast.Assign):
-            name = getattr(node.targets[0], 'id', '')
-            if name == 'OUTPUT_PATH':
-                node.value = ast.parse(f'Path({str(output)!r})', mode='eval').body
-            elif name == 'annotated_line' and line is not None:
-                node.value = ast.Constant(line)
-    scope = {}
-    with redirect_stdout(StringIO()):
-        exec(compile(ast.fix_missing_locations(tree), str(SOURCE), 'exec'), scope)
-    return scope
+    # Explicit position for Bxh4 and Rf7+, independent of the editable demo.
+    board = chess.Board("5rk1/K7/8/8/7p/6B1/8/8 w - - 0 1")
+    scene = compile_sequence(board, line or "", 0.7)
+    return {**scene, "parse_move_token": parse_move_token}
 
 
 class MoveTokenParserTests(unittest.TestCase):

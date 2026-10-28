@@ -1,0 +1,83 @@
+
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+
+<meta charset="UTF-8">
+
+<title>Chess Sequence Animation</title>
+
+<style>
+${styles}
+</style>
+
+</head>
+
+
+<body>
+
+
+<div class="short-canvas">
+
+    <div class="board-area">
+
+        <div class="board-container">
+        <div class="board-camera" id="board">
+
+            <img
+                class="board-background"
+                src="../assets/board.svg"
+            >
+
+            <div id="fromHighlight" class="move-highlight from-highlight" aria-hidden="true"></div>
+            <div id="toHighlight" class="move-highlight to-highlight" aria-hidden="true"></div>
+            <div id="checkTargetLayer" class="check-target-layer" aria-hidden="true"></div>
+            <svg id="arrowLayer" class="arrow-layer brilliant" viewBox="0 0 ${BOARD_LOGICAL_SIZE} ${BOARD_LOGICAL_SIZE}" aria-hidden="true">
+                <defs>
+                    <marker id="brilliantArrowhead" viewBox="0 0 48 48"
+                            markerWidth="48" markerHeight="48" refX="46" refY="24"
+                            orient="auto" markerUnits="userSpaceOnUse">
+                        <path d="M 2 2 L 46 24 L 2 46 L 12 24 Z" fill="currentColor" />
+                    </marker>
+                </defs>
+                <line id="brilliantArrow" stroke="currentColor" stroke-width="18"
+                      stroke-linecap="round" marker-end="url(#brilliantArrowhead)" />
+            </svg>
+            <div id="annotationBadge" class="annotation-badge" aria-hidden="true"></div>
+            <div id="annotationPill" class="annotation-pill" aria-hidden="true"></div>
+
+        </div>
+
+    </div>
+
+    </div>
+
+    <div class="reaction-area">
+        ${meme_video}
+        ${meme_comment}
+    </div>
+
+</div>
+
+
+<div class="controls">
+
+    <button id="playButton" onclick="playSequence()">
+        Play Sequence
+    </button>
+
+</div>
+
+
+${music_audio}
+
+<script>
+${runtime}
+</script>
+
+
+</body>
+
+</html>

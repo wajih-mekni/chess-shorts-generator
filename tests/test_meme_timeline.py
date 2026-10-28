@@ -3,20 +3,21 @@
 Run: python tests/test_meme_timeline.py
 Requires Playwright + Chromium (same Python dependencies as the exporter).
 """
-from contextlib import redirect_stdout
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
-from io import StringIO
-import json
 from pathlib import Path
-import re
 import tempfile
 import threading
+import sys
+import chess
 
 from playwright.sync_api import sync_playwright
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE = ROOT / 'src/generate_sequence_animation.py'
+sys.path.insert(0, str(ROOT))
+from src.renderer.chess_state import compile_sequence
+from src.renderer.composition import render_scene
+from src.renderer.camera import BRILLIANT_POST_HOLD
 CASES = [
     '(meme) e4(1s) e5(1s) Nf3',
     'e4(1s) e5(1s) (meme) Nf3',
@@ -32,16 +33,11 @@ class QuietHandler(SimpleHTTPRequestHandler):
 
 
 def generate(line, output, meme=True):
-    source = SOURCE.read_text()
-    source = re.sub(r'board = chess.Board\(.*?\)', 'board = chess.Board()', source, count=1, flags=re.S)
-    source = re.sub(r'annotated_line = .*', f'annotated_line = {line!r}', source, count=1)
-    source = source.replace('OUTPUT_PATH = Path("output/sequence_demo.html")', f'OUTPUT_PATH = Path({str(output)!r})')
-    if not meme:
-        source = re.sub(r'MEME_PATH = .*', 'MEME_PATH = None', source, count=1)
-    scope = {}
-    with redirect_stdout(StringIO()):
-        exec(compile(source, str(SOURCE), 'exec'), scope)
-    return scope
+    scene = compile_sequence(chess.Board(), line, 2)
+    output.write_text(render_scene(scene,
+        meme_path="../assets/memes/MonkeyCry.mp4" if meme else None,
+        meme_volume=0.8, music_path="../assets/music/background.mp3", music_volume=0.8))
+    return scene
 
 
 def instrument(page):
@@ -139,7 +135,7 @@ def main():
                         else:
                             assert abs(meme_time-event(trace,'land','e5')) < 30
                             assert abs(meme_time-event(trace,'sound','e5')) < 30
-                            assert 2950 <= event(trace,'move-start','f3')-event(trace,'effects','e5') <= 3250
+                            assert 2950 + BRILLIANT_POST_HOLD <= event(trace,'move-start','f3')-event(trace,'effects','e5') <= 3250 + BRILLIANT_POST_HOLD
                         print(f'PASS Chromium case {i+1}, replay {replay}: {CASES[i]}',flush=True)
                     assert not errors,errors
                     page.close()

@@ -1,0 +1,257 @@
+
+
+body {
+    margin: 0;
+    background: #222;
+
+    min-height: 100vh;
+
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+}
+
+
+.short-canvas {
+    position: relative;
+
+    width: ${CANVAS_WIDTH}px;
+    height: ${CANVAS_HEIGHT}px;
+    flex-shrink: 0;
+
+    background: linear-gradient(155deg, #f2e4ce 0%, #d9bb92 65%, #c8a57e 100%);
+
+    overflow: hidden;
+}
+
+
+/* Fixed warm viewport crops the camera scene; reaction remains a sibling. */
+.board-area {
+    overflow: hidden;
+    isolation: isolate;
+    position: absolute;
+    left: ${FRAME_X}px;
+    top: ${FRAME_Y}px;
+    width: ${BOARD_FRAME_SIZE}px;
+    height: ${BOARD_FRAME_SIZE}px;
+    box-sizing: border-box;
+    border-radius: 22px;
+    background: linear-gradient(145deg, #fff1da, #dcb98a);
+    box-shadow: 0 12px 28px rgba(91, 57, 25, 0.18),
+                inset 0 0 0 2px rgba(255, 255, 255, 0.55);
+}
+
+.board-container {
+    position: absolute;
+    left: ${FRAME_PADDING}px;
+    top: ${FRAME_PADDING}px;
+    width: ${BOARD_LOGICAL_SIZE}px;
+    height: ${BOARD_LOGICAL_SIZE}px;
+    transform: scale(${BOARD_SCALE});
+    transform-origin: top left;
+}
+
+
+.board-camera {
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+
+/* Overscan backing prevents transparent gaps during bounded pan/rotation.
+   It belongs to the camera, behind every chess layer. */
+.board-camera::before {
+    content: "";
+    position: absolute;
+    inset: -${CAMERA_OVERSCAN}px;
+    background: linear-gradient(145deg, #fff1da, #dcb98a);
+    pointer-events: none;
+}
+
+.board-background {
+    position: absolute;
+
+    width: ${BOARD_LOGICAL_SIZE}px;
+    height: ${BOARD_LOGICAL_SIZE}px;
+
+    left: 0;
+    top: 0;
+
+    z-index: 1;
+}
+
+
+.piece {
+    position: absolute;
+
+    width: ${SQUARE_SIZE}px;
+    height: ${SQUARE_SIZE}px;
+
+    z-index: 5;
+
+    transform-origin: center center;
+}
+/* Effects use one shared color, with independent layer opacity. */
+.move-highlight {
+    position: absolute;
+    width: ${SQUARE_SIZE}px;
+    height: ${SQUARE_SIZE}px;
+    z-index: 3;
+    display: none;
+    pointer-events: none;
+    background: var(--annotation-color);
+}
+
+.from-highlight { opacity: 0.25; }
+.to-highlight { opacity: 0.46; }
+
+.check-target-layer {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    pointer-events: none;
+}
+
+.check-target {
+    position: absolute;
+    width: ${SQUARE_SIZE}px;
+    height: ${SQUARE_SIZE}px;
+    display: none;
+    background: #ff3b30;
+}
+
+.arrow-layer {
+    position: absolute;
+    inset: 0;
+    width: ${BOARD_LOGICAL_SIZE}px;
+    height: ${BOARD_LOGICAL_SIZE}px;
+    z-index: 4;
+    display: none;
+    pointer-events: none;
+    color: var(--annotation-color);
+    opacity: 0.85;
+}
+
+.annotation-badge {
+    position: absolute;
+    z-index: 10;
+    display: none;
+    width: 58px;
+    height: 58px;
+    box-sizing: border-box;
+    border: 2px solid rgba(255, 255, 255, 0.8);
+    border-radius: 50%;
+    background: var(--annotation-color);
+    color: #fff;
+    font-family: Arial, sans-serif;
+    font-weight: 900;
+    font-size: 30px;
+    line-height: 1;
+    letter-spacing: -2px;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.35),
+                inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.annotation-pill {
+    position: absolute;
+    z-index: 9;
+    display: none;
+    box-sizing: border-box;
+    height: 46px;
+    padding: 0 16px;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 23px;
+    background: var(--annotation-color);
+    background: color-mix(in srgb, var(--annotation-color) 94%, transparent);
+    color: #fff;
+    font: 700 26px/1 Arial, sans-serif;
+    white-space: nowrap;
+    align-items: center;
+    pointer-events: none;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
+}
+
+.brilliant { --annotation-color: #26C2A3; }
+.great { --annotation-color: #4A90E2; }
+.excellent { --annotation-color: #7FAE3F; }
+.inaccuracy { --annotation-color: #E6B73C; }
+.mistake { --annotation-color: #F08A35; }
+.blunder { --annotation-color: #E04B4B; }
+
+
+/* Reaction / meme */
+.reaction-area {
+    position: absolute;
+    left: ${MEME_X}px;
+    top: ${MEME_Y}px;
+    width: ${MEME_WIDTH}px;
+    height: ${MEME_HEIGHT}px;
+    border-radius: 18px;
+    box-shadow: 0 8px 24px rgba(91, 57, 25, 0.16);
+    overflow: hidden;
+
+    background: #c5a780;
+
+    display: flex;
+    justify-content: center;
+    align-items: center;
+
+    font-family: Arial, sans-serif;
+    font-size: 42px;
+    color: #777;
+}
+
+
+.reaction-area video {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: ${MEME_FIT};
+}
+
+.meme-comment {
+    position: absolute;
+    top: 24px;
+    left: 24px;
+    right: ${CAPTION_RIGHT}px;
+    z-index: 10;
+    width: auto;
+    box-sizing: border-box;
+    padding: 12px 20px;
+    border-radius: 14px;
+    background: rgba(0, 0, 0, 0.72);
+    color: #fff;
+    font: 700 36px/1.25 Arial, sans-serif;
+    text-align: center;
+    overflow-wrap: anywhere;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+    pointer-events: none;
+}
+
+/* Play button only for development */
+.controls {
+    position: fixed;
+
+    top: 20px;
+    right: 20px;
+
+    z-index: 9999;
+}
+
+
+button {
+    padding: 12px 24px;
+
+    font-size: 18px;
+
+    border: none;
+    border-radius: 8px;
+
+    cursor: pointer;
+}
+

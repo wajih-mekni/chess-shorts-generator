@@ -1,9 +1,9 @@
-// Run after generation: node tests/test_sequence_audio.cjs
+// Run via tests/test_renderer.py, which supplies the dedicated five-move HTML fixture.
 const fs = require('node:fs');
 const vm = require('node:vm');
 const assert = require('node:assert/strict');
 const path = require('node:path');
-const html = fs.readFileSync(path.join(__dirname, '../output/sequence_demo.html'), 'utf8');
+const html = fs.readFileSync(process.argv[2] || path.join(__dirname, '../output/sequence_demo.html'), 'utf8');
 const script = html.match(/<script>([\s\S]*?)<\/script>/)[1];
 const started = [];
 let failAudio = false;
@@ -36,11 +36,14 @@ class Element {
     appendChild() {}
     remove() { this.removed = true; }
     setAttribute() {}
-    animate() {}
+    animate() {
+        return {finished: Promise.all(this.transitions.map(t => t.finished)), cancel() {}};
+    }
     getAnimations() { return this.transitions; }
 }
 const elements = {};
 const sandbox = vm.createContext({
+    getComputedStyle: element => ({transform: element.style.transform || "none"}),
     assert, started, Element, console: { ...console, warn() {} },
     Audio, clearTimeout, setTimeout: (fn, ms) => ms === 500 ? fn() : setTimeout(fn, ms),
     document: {
@@ -97,7 +100,7 @@ async function main() {
             assert.equal(started.length, before, 'must wait for both axes');
             finishY();
             // Drain the landing continuation; rook completion stays pending.
-            for (let i=0;i<8;i++) await Promise.resolve();
+            for (let i=0;i<16;i++) await Promise.resolve();
             assert.equal(started.length, before+1);
             assert.equal(started.at(-1), '../assets/sfx/' + kind + '.webm');
             if (finishRook) finishRook();

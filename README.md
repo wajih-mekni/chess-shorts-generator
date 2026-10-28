@@ -169,7 +169,7 @@ untouched.
 
 ## Shorts composition
 
-Layout settings live together at the top of `src/generate_sequence_animation.py`.
+Layout settings live together in `src/renderer/layout.py`.
 The 1080×1920 canvas uses a 960px board at (60, 180), inside a 1020px
 warm frame starting at y=150. The 980×440 reaction panel begins at (50, 1200),
 leaving 280px below it. `MEME_FIT = "contain"` preserves the whole source image
@@ -180,3 +180,138 @@ part of the rightmost file on a centered board of this size.
 
 Regenerate the HTML after changing these settings. `output/layout_preview.png`
 is a single representative frame of the updated composition.
+
+
+## Renderer architecture
+
+Edit the demo position, annotated line, and media settings in
+`src/generate_sequence_animation.py`. Importing it no longer writes an output file;
+call `generate()` or run the script. The scene compiler and compositor can also
+be used directly for other positions without editing source or creating files.
+
+| Component | Responsibility |
+| --- | --- |
+| `src/renderer/chess_state.py` | Existing SAN/annotation/timing parsing and legal move metadata; `compile_sequence()` copies the board and returns pieces, moves, and ordered events. |
+| `src/renderer/layout.py` | Canvas, board, frame, safe areas, and reaction geometry shared by composition and export. |
+| `src/renderer/scene.html`, `scene.css` | Board/frame, camera boundary, overlay layers, reaction panel, and styling. |
+| `src/renderer/board.js` | Shared board-local square coordinates and placement. |
+| `src/renderer/pieces.js` | Sprite lifecycle, captures, promotion, castling, and `animatePieceMove(move, onLand)`. |
+| `src/renderer/camera.js` | Shared eased camera transform around board, pieces, and overlays. |
+| `src/renderer/effects.js` | Existing check highlights, arrows, annotation badges and labels. |
+| `src/renderer/media.js`, `audio.js` | Meme/music playback and chess sound loading/playback. |
+| `src/renderer/timeline.js` | Ordered event dispatch, landing callbacks, pauses, and replay. |
+| `src/renderer/composition.py` | Serializes scene/configuration and embeds templates and runtime into one HTML file. |
+| `src/export_video.py` | Captures the browser's final composition and audio into MP4. |
+
+Flow: position + annotated SAN → compiled scene → composed HTML → timeline
+handlers → piece movement → landing audio/check/meme → rook/promotion completion
+→ annotation effects → move pause. Standalone meme events run between moves.
+The board uses one logical coordinate system scaled by the composition. The
+camera boundary is inside that scale and excludes the frame and reaction panel.
+
+Add future visual behavior in the owning renderer and call it from the timeline;
+new event types can be registered in `timelineHandlers`. Camera focus/zoom live in `camera.js`; cinematic capture effects are not implemented. Runtime
+files are concatenated into a single script to retain file-based previews and the
+existing playback/export hooks without a JS build tool.
+
+Generate the representative test video:
+
+```bash
+.venv/bin/python src/generate_sequence_animation.py
+.venv/bin/python src/export_video.py --output output/refactor_test.mp4
+```
+
+Run regression checks (browser/export checks require the normal export setup):
+
+```bash
+.venv/bin/python -m unittest discover -s tests -p 'test_*.py'
+.venv/bin/python tests/test_meme_timeline.py
+.venv/bin/python tests/test_video_export.py
+```
+
+The unit suite runs the existing Node audio assertions against a dedicated
+five-move fixture. Parser and browser tests also use explicit positions/media,
+so changing demo settings no longer changes their assumptions.
+
+## Cinematic piece movement
+
+`src/renderer/motion.py` defines `MOVE_DURATION` (milliseconds), `MOVE_EASING`,
+`MOVE_SCALE_PEAK`, `MOVE_ROTATION` (degrees), `MOVE_OVERSHOOT` (fraction of a
+square), and `MOVE_BLUR` (logical pixels; disabled by default). Regenerate HTML
+after tuning them. `NORMAL_MOVE`, `FAST_MOVE`, and `DRAMATIC_MOVE` are reusable
+presets derived from these defaults. Rotation and blur can be disabled with zero;
+scale can be disabled with 1, and overshoot with zero.
+
+`render_scene(..., movement_preset="DRAMATIC_MOVE")` selects a scene default.
+Set `move["animation_preset"] = "FAST_MOVE"` on a compiled move to override it
+(including its castling rook). The SAN parser is unchanged. The runtime entry
+point is `animatePieceToSquare(element, square, presetName)` in `motion.js`.
+It animates board-local position, scale, rotation and optional blur together,
+then commits the exact destination and removes all transient animation styles.
+Landing sound/check/meme triggers occur after settling, before the existing
+promotion/castling completion and annotation/pause stages. Camera motion is independent; the piece-only demo disables it.
+
+Generate the five-move comparison (`e4 e5 Nf3 Nc6 Bc4`):
+
+```bash
+.venv/bin/python src/generate_motion_demo.py
+.venv/bin/python src/export_video.py --html output/motion_demo.html --output output/cinematic_moves_test.mp4
+.venv/bin/python tests/test_piece_motion.py
+```
+
+The demo uses normal, fast, dramatic, normal, dramatic presets respectively,
+with 0.8-second pauses, and leaves the main demo settings untouched.
+
+## Destination-focused camera directing
+
+- No suffix: retain the current shot; start the video at full-board framing.
+- `@J`: ease back to wide (zoom 1, centered translation, zero rotation), 380 ms.
+- `@K`: medium destination focus, desired zoom 2.05, 4×4-square context, 300 ms.
+- `@L`: close destination focus, desired zoom 3.15, 2.5×2.5-square context, 240 ms.
+
+`src/renderer/camera.py` centralizes zoom, local region size, per-shot duration,
+rotation, easing, translation/zoom limits and overscan. Region size is in square
+widths; timings are milliseconds. Regenerate HTML after changing configuration.
+
+`camera_focus_destination(square, shot_type)` builds a local neighborhood around
+the landing square. Near edges it shifts the neighborhood inward to retain real
+board context. It rotates the region's corners and fits that region within the
+viewport and translation limits. The resulting absolute pose is independent of
+the source square and move distance. `camera_frame_move()` is retained as a
+compatibility wrapper, with the same destination-only behavior. The destination
+is centered for interior shots and slightly offset near board edges.
+
+The camera interpolates from the current shot to the new pose and remains there.
+It establishes the destination shot before piece movement; an approaching piece
+can intentionally enter from offscreen. All chess layers share this transform,
+while the frame clips the scene and warm overscan fills exposed margins. The
+reaction panel stays fixed. Replay starts wide. Unmarked moves never reframe.
+
+`BRILLIANT_PRE_HOLD = 120` pauses after camera framing and before piece motion
+for `!!` moves only. `BRILLIANT_POST_HOLD = 180` adds to their existing post-move
+pause after effects are shown. Both are configurable in `camera.py`, apply even
+without a camera directive, and can be disabled with zero. Landing sounds/checks
+and move-triggered memes still fire at actual landing; media keeps playing through
+holds. Normal moves receive neither hold. No new effects or piece motion changes.
+
+Camera parsing is unchanged: `parse_camera_directive()` removes one `@J`, `@K`,
+or `@L` before existing evaluation/timing/meme/SAN parsing. Each compiled move
+stores `camera_directive`, also referenced by its timeline event. Examples:
+`Nf3!!@L(0.8s)(meme)` and `Nf3@L!!(0.8s)(meme)`.
+
+Generate the browser demo:
+
+```bash
+.venv/bin/python src/generate_camera_demo.py
+```
+
+Open `output/camera_demo.html` and click **Play Sequence**. A sparse legal
+position demonstrates `Nf3@L`, `Bc4@K`, the long queen entrance `Qd5@L`,
+`Qe5!!@L` with extra holds, and `Kh7@J` returning wide. Intervening unmarked
+moves preserve the shot. The current aggressive piece presets are unchanged.
+
+```bash
+.venv/bin/python -m unittest discover -s tests -p 'test_*.py'
+.venv/bin/python tests/test_camera.py
+.venv/bin/python tests/test_meme_timeline.py
+```

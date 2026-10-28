@@ -15,7 +15,10 @@ import threading
 import time
 
 ROOT = Path(__file__).resolve().parents[1]
-WIDTH, HEIGHT = 1080, 1920
+try:
+    from .renderer.layout import CANVAS_WIDTH as WIDTH, CANVAS_HEIGHT as HEIGHT
+except ImportError:
+    from renderer.layout import CANVAS_WIDTH as WIDTH, CANVAS_HEIGHT as HEIGHT
 
 
 def run(command, **kwargs):
@@ -86,7 +89,7 @@ def export(args):
         xlog = stack.enter_context((log_dir / "xvfb.log").open("w"))
         try:
             xvfb = subprocess.Popen([
-                "Xvfb", "-displayfd", str(write_fd), "-screen", "0", "1080x1920x24",
+                "Xvfb", "-displayfd", str(write_fd), "-screen", "0", f"{WIDTH}x{HEIGHT}x24",
                 "-nolisten", "tcp", "-auth", str(authority), "-noreset"],
                 pass_fds=(write_fd,), stdout=xlog, stderr=xlog)
             stack.callback(stop, xvfb)
@@ -156,7 +159,7 @@ def export(args):
             str(work / "browser"), headless=False, viewport={"width": WIDTH, "height": HEIGHT},
             device_scale_factor=1, env=env, ignore_default_args=["--mute-audio"],
             executable_path=args.chromium,
-            args=["--kiosk", "--window-position=0,0", "--window-size=1080,1920",
+            args=["--kiosk", "--window-position=0,0", f"--window-size={WIDTH},{HEIGHT}",
                   "--autoplay-policy=no-user-gesture-required", "--disable-dev-shm-usage",
                   "--disable-background-timer-throttling", "--disable-renderer-backgrounding",
                   "--disable-backgrounding-occluded-windows", "--force-device-scale-factor=1"])
@@ -180,18 +183,18 @@ def export(args):
         page.goto(url, wait_until="load", timeout=60000)
         # Export-only CSS: the generated HTML and all animation code stay intact.
         page.add_style_tag(content="""
-            html, body { margin:0!important; width:1080px!important; height:1920px!important;
+            html, body { margin:0!important; width:__WIDTH__px!important; height:__HEIGHT__px!important;
                 overflow:hidden!important; }
             body { display:block!important; }
             .short-canvas { position:absolute!important; left:0!important; top:0!important; }
             .controls { display:none!important; }
             * { cursor:none!important; }
-        """)
+        """.replace("__WIDTH__", str(WIDTH)).replace("__HEIGHT__", str(HEIGHT)))
         cdp = context.new_cdp_session(page)
         window_id = cdp.send("Browser.getWindowForTarget")["windowId"]
         cdp.send("Browser.setWindowBounds", {"windowId": window_id,
                                            "bounds": {"windowState": "fullscreen"}})
-        page.wait_for_function("innerWidth === 1080 && innerHeight === 1920", timeout=10000)
+        page.wait_for_function(f"innerWidth === {WIDTH} && innerHeight === {HEIGHT}", timeout=10000)
         page.wait_for_function("""() => [...document.images].every(i => i.complete && i.naturalWidth)
             && [...document.querySelectorAll('video,audio')].every(m => m.readyState >= 3)
             && [...moveAudio.values()].every(m => m.readyState >= 3)""", timeout=60000)
@@ -215,7 +218,7 @@ def export(args):
             "ffmpeg", "-hide_banner", "-y", "-nostats", "-copyts",
             "-thread_queue_size", "512", "-use_wallclock_as_timestamps", "1",
             "-f", "x11grab", "-draw_mouse", "0", "-framerate", str(args.fps),
-            "-video_size", "1080x1920", "-i", display + ".0+0,0",
+            "-video_size", f"{WIDTH}x{HEIGHT}", "-i", display + ".0+0,0",
             "-thread_queue_size", "512", "-use_wallclock_as_timestamps", "1",
             "-f", "pulse", "-sample_rate", "48000", "-channels", "2",
             "-i", monitor, "-map", "0:v:0", "-map", "1:a:0",
@@ -228,7 +231,7 @@ def export(args):
                  or recorder.poll() is not None, 20, "FFmpeg recording")
         if recorder.poll() is not None:
             raise RuntimeError("FFmpeg capture failed; see capture.log")
-        print(f"Recording 1080x1920 at {args.fps} fps with browser audio…", flush=True)
+        print(f"Recording {WIDTH}x{HEIGHT} at {args.fps} fps with browser audio…", flush=True)
         # Call the existing button handler, measuring the exact lifetime of its
         # promise (including the final move's pause). No estimated sequence length.
         page.evaluate("""() => {
