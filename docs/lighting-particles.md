@@ -15,6 +15,11 @@ python3 -m http.server 8000
 
 Open <http://localhost:8000/output/lighting_demo.html>.
 
+The **Strength comparison** selector switches between the original Stage 5 values
+and the tuned values for the same scenario, treatment, palette and authored hold.
+The original snapshot lives in `assets/references/stage5-before-tuning.json` and
+is used only by the demo. Production always uses the current Python configuration.
+
 Nine scenarios cover ordinary local accents, cyan/green heroes, red checking
 capture, orange tension, diagonal capture fragments, knight arrival sparks, a
 five-second hero hold, and disabled lighting. Change treatment, palette or hold;
@@ -102,7 +107,7 @@ replay counter. Identical inputs produce identical sizes, paths, rotation,
 birth delays and lifetimes. Geometry is time-based rather than frame-count-based.
 Each emitted batch shares the document animation timeline.
 
-Particles use a bounded pool: ten capture fragments, ten arrival sparks and six
+Particles use a bounded pool: ten capture fragments, fourteen arrival sparks and eight
 staggered ambient points in the default combined hero. The configurable maximum
 is 64 allocated particles per move. Ambient points repeat with finite iterations
 through the entire authored hold, so long holds do not allocate more nodes or
@@ -132,6 +137,48 @@ These guide the 500 ms cadence. Glow, color breathing and repeated rings remain
 active after landing, while sparse dust keeps moving. Fade envelopes bound the
 start/end. Exact colors, glow strengths and particle counts are tunable design
 choices; they cannot be recovered precisely from the graded flattened reference.
+
+## Visual tuning pass before Stage 6
+
+The existing reference pulses around 32.25–33.85 s were inspected again alongside
+the original and tuned gallery. This pass changes amplitudes, colors and the
+existing hero oscillation period. It adds no renderer system or automatic selection.
+
+| Control | Before → tuned | Where to change it |
+|---|---|---|
+| Arrival kick displacement | 4 → 18 logical px | `camera.py`: `CAMERA_IMPACT_TRANSLATION` |
+| Arrival zoom / rotation | 0.6% → 4.5% / 0.18° → 1.15° | `CAMERA_IMPACT_ZOOM`, `CAMERA_IMPACT_ROTATION` |
+| Kick rebound / settling strength | 0.45 → 0.62 / 0.14 → 0.22 | `CAMERA_IMPACT_REBOUND`, `CAMERA_IMPACT_SETTLE` |
+| Held hero displacement / rotation | 5 → 12 px / 0.18° → 0.8° | `CAMERA_HERO_TRANSLATION`, `CAMERA_HERO_ROTATION` |
+| Hero zoom pulse / oscillation period | 1% → 5% / 1600 → 640 ms | `CAMERA_HERO_ZOOM`, `CAMERA_HERO_DRIFT_PERIOD` |
+| Board color wash opacity | 0.22 → 0.48 | `lighting.py`: `LIGHT_PRIMITIVES['BOARD_WASH']['opacity']` |
+| Hero bloom size / opacity | 3.5 → 4.2 squares / 0.85 → 1 | `HERO_BLOOM`: `size`, `opacity` |
+| Bloom breathing depth | 0.30 → 0.50 | `HERO_BLOOM['pulse']` (larger means a deeper trough) |
+| Arrival flash peak | 0.28 → 0.55 | `IMPACT_FLASH['opacity']`; duration stays 150 ms |
+| Ring diameter / expansion / stroke | 0.62 → 0.78 / 2.5 → 3.15 / 0.018 → 0.026 | `BADGE_RING`: `size`, `endScale`, `border` |
+| Palette saturation | More saturated cyan, green, orange and red | `ACCENT_PALETTES[*]['color']` |
+| Spark / ambient density | 10 → 14 sparks / 6 → 8 ambient actors | `PARTICLE_PRIMITIVES`: `count`, `size`, `opacity` |
+
+Smaller camera amplitudes reduce the punch; a longer drift period slows the held
+oscillation. Camera zoom values are additions to 1 (0.05 means +5%). Keep the
+500 ms pulse period for the reference-like recurrence, or adjust it centrally.
+The existing safety envelope automatically reserves more framing space for the
+larger simultaneous impulses, so the target region remains visible. This can make
+the resting reference framing slightly wider; do not bypass the safety margin to
+compensate. Neutral board colors, ordinary reframe amplitudes and the ordinary
+square accent strength are unchanged. LEGACY timing/camera and disabled lighting
+paths remain available unchanged.
+
+The original triggers remain: `@L` enables the arrival kick, and `!!` enables the
+existing hero camera hold. A lighting `HERO` selection alone does not infer those
+camera instructions. Wash/bloom/ring/dust changes are confined to recipes already
+using them; ordinary moves do not gain a wash or particle burst.
+
+All 16 Python/Node tests and the real-browser lighting and timing/camera suites
+pass with the stronger values. Before/tuned comparisons were inspected for all
+four palettes, including reset while effects were active. The reference's curved
+grid-line wobble still needs a separate nonlinear deformation system; none was
+added in this pass.
 
 ## Files and checks
 

@@ -140,7 +140,7 @@ is logical viewport pixels before the fixed layout scale, independent of shot zo
 | `camera.py` | `CAMERA_MEDIUM_ZOOM=2.05`, `CAMERA_CLOSE_ZOOM=3.15`, local regions 4 / 2.5 squares | Existing destination shot strengths; solver constrains the visible region |
 | `camera.py` | Reference persistent rotations 0.35° / 0.6° | Restrained chosen amplitudes; ordinary source grids largely upright |
 | `camera.py` | `CAMERA_REFRAME_*`, `CAMERA_IMPACT_*` | Chosen overshoot/settle and 190 ms arrival accent; no inferred exact shake amplitude |
-| `camera.py` | `CAMERA_HERO_PULSE_PERIOD=500`, `CAMERA_HERO_DRIFT_PERIOD=1600`, `CAMERA_HERO_TRANSLATION/ZOOM/ROTATION` | Approximate observed pulse period; chosen restrained drift/amplitudes |
+| `camera.py` | `CAMERA_HERO_PULSE_PERIOD=500`, `CAMERA_HERO_DRIFT_PERIOD=640`, `CAMERA_HERO_TRANSLATION/ZOOM/ROTATION` | Approximate observed pulse period; stronger amplitudes from the [Stage 5 visual tuning pass](lighting-particles.md#visual-tuning-pass-before-stage-6) |
 | `timing.py` | `REFERENCE_HERO_HOLD=2800` | Demo's authored pause, from measured 2.5–3 s hero holds |
 
 Tune camera durations/leads first, then shot zoom/region, then transient amplitudes.

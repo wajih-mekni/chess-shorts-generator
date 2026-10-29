@@ -11,30 +11,30 @@ EFFECT_FADE_DURATION = 180
 MAX_PARTICLES = 64
 REFERENCE_THEME = dict(light='#e2e5e6', dark='#626a70', backing='#394148', canvas='#20272d')
 ACCENT_PALETTES = {
-    'CYAN': dict(color='#20d9ee', core='#e4ffff'),
-    'GREEN': dict(color='#79ed66', core='#f0ffe7'),
-    'ORANGE': dict(color='#ff943f', core='#fff0cf'),
-    'RED': dict(color='#ff435b', core='#ffe3e7'),
+    'CYAN': dict(color='#00eaff', core='#e4ffff'),
+    'GREEN': dict(color='#45ff42', core='#f0ffe7'),
+    'ORANGE': dict(color='#ff7818', core='#fff0cf'),
+    'RED': dict(color='#ff2445', core='#ffe3e7'),
 }
 
 # Independent primitives: no writes to camera, actor or annotation transforms.
 LIGHT_PRIMITIVES = {
     'SQUARE_GLOW': dict(space='under', shape='square', size=1, opacity=.32, duration=420, pulse=.18),
-    'LOCAL_GLOW': dict(space='under', shape='glow', size=2.1, opacity=.65, duration=480, pulse=.22),
-    'HERO_BLOOM': dict(space='under', shape='glow', size=3.5, opacity=.85, duration=0, pulse=.30),
-    'IMPACT_FLASH': dict(space='viewport', shape='flash', opacity=.28, duration=150, peak=.12),
-    'BOARD_WASH': dict(space='viewport', shape='wash', opacity=.22, duration=0, pulse=.24, vignette=.22),
-    'BADGE_RING': dict(space='over', shape='ring', size=.62, opacity=.8, duration=0,
-                       period=PULSE_PERIOD, endScale=2.5, border=.018),
+    'LOCAL_GLOW': dict(space='under', shape='glow', size=2.45, opacity=.78, duration=480, pulse=.22),
+    'HERO_BLOOM': dict(space='under', shape='glow', size=4.2, opacity=1.0, duration=0, pulse=.50),
+    'IMPACT_FLASH': dict(space='viewport', shape='flash', opacity=.55, duration=150, peak=.08),
+    'BOARD_WASH': dict(space='viewport', shape='wash', opacity=.48, duration=0, pulse=.30, vignette=.32),
+    'BADGE_RING': dict(space='over', shape='ring', size=.78, opacity=1.0, duration=0,
+                       period=PULSE_PERIOD, endScale=3.15, border=.026),
 }
 PARTICLE_PRIMITIVES = {
     'CAPTURE_FRAGMENTS': dict(count=10, lifetime=420, size=[.035,.075], distance=[.3,.9],
                               spread=1, bias=.7, gravity=.25, rotation=220, opacity=.95),
-    'ARRIVAL_SPARKS': dict(count=10, lifetime=360, size=[.018,.045], distance=[.35,1.2],
+    'ARRIVAL_SPARKS': dict(count=14, lifetime=360, size=[.025,.055], distance=[.45,1.45],
                           spread=1, bias=0, gravity=.1, rotation=70, opacity=.9),
-    'AMBIENT_DUST': dict(count=3, lifetime=1000, period=PULSE_PERIOD, size=[.018,.035],
+    'AMBIENT_DUST': dict(count=4, lifetime=1000, period=PULSE_PERIOD, size=[.022,.040],
                         distance=[.08,.3], extent=2.5, spread=1, bias=0, gravity=-.12,
-                        rotation=0, opacity=.6),
+                        rotation=0, opacity=.8),
 }
 EFFECT_PRESETS = {
     'LOCAL_ACCENT': dict(contact=['SQUARE_GLOW'], capture=[], hold=[]),

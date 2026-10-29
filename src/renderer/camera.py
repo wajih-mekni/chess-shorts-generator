@@ -1,7 +1,7 @@
 """Camera profiles: milliseconds, degrees, local square widths and logical pixels.
 
 REFERENCE transition durations come from grid-spacing measurements in the supplied
-video (see docs/reference-motion-analysis.md). Amplitudes below are conservative
+video (see docs/reference-motion-analysis.md). Amplitudes below are tuned
 design choices for our square viewport, not recovered source keyframes.
 """
 from math import cos, prod, radians, sin
@@ -34,7 +34,7 @@ REFERENCE_CAMERA_WIDE_DURATION = 450  # Measured pull range: about 400–500 ms.
 REFERENCE_CAMERA_MEDIUM_ROTATION = 0.35  # Chosen; stable reference grids are upright.
 REFERENCE_CAMERA_CLOSE_ROTATION = 0.6
 
-# Independent transient tracks; these are chosen restrained amplitudes. Translation
+# Independent transient tracks; reframe stays restrained, impacts/heroes punch. Translation
 # is screen-relative in board logical pixels, outside the persistent camera zoom.
 CAMERA_REFRAME_SETTLE_DURATION = 120
 CAMERA_REFRAME_TRANSLATION = 7.0
@@ -44,19 +44,19 @@ CAMERA_REFRAME_PEAK = 0.82  # Fraction of the persistent transition duration.
 CAMERA_REFRAME_REBOUND = 0.20
 
 CAMERA_IMPACT_DURATION = 190
-CAMERA_IMPACT_TRANSLATION = 4.0
-CAMERA_IMPACT_ZOOM = 0.006
-CAMERA_IMPACT_ROTATION = 0.18
-CAMERA_IMPACT_REBOUND = 0.45
-CAMERA_IMPACT_SETTLE = 0.14
+CAMERA_IMPACT_TRANSLATION = 18.0
+CAMERA_IMPACT_ZOOM = 0.045
+CAMERA_IMPACT_ROTATION = 1.15
+CAMERA_IMPACT_REBOUND = 0.62
+CAMERA_IMPACT_SETTLE = 0.22
 CAMERA_IMPACT_PEAK_AT = 0.18
 CAMERA_IMPACT_REBOUND_AT = 0.44
 CAMERA_IMPACT_SETTLE_AT = 0.72
 
-CAMERA_HERO_TRANSLATION = 5.0
-CAMERA_HERO_ZOOM = 0.010
-CAMERA_HERO_ROTATION = 0.18
-CAMERA_HERO_DRIFT_PERIOD = 1600
+CAMERA_HERO_TRANSLATION = 12.0
+CAMERA_HERO_ZOOM = 0.050
+CAMERA_HERO_ROTATION = 0.80
+CAMERA_HERO_DRIFT_PERIOD = 640
 CAMERA_HERO_PULSE_PERIOD = 500  # Approximate observed pulse rhythm; not music sync.
 CAMERA_HERO_SAMPLE_INTERVAL = 32
 
