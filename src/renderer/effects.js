@@ -16,6 +16,15 @@ const annotationBadge = document.getElementById("annotationBadge");
 const annotationPill = document.getElementById("annotationPill");
 const effectElements = [fromHighlight, toHighlight, arrowLayer, annotationBadge, annotationPill];
 
+// Sequence/export completion includes the final existing badge/check fade even
+// when the last authored reading pause is shorter than its visual animation.
+function finishMoveEffects() {
+    return Promise.all([...effectElements, ...checkOverlays].flatMap(element =>
+        element.getAnimations().map(animation => animation.finished.catch(error => {
+            if (error.name !== "AbortError") throw error;
+        }))));
+}
+
 function clearCheckEffects() {
     checkOverlays.forEach(overlay => {
         overlay.getAnimations().forEach(animation => animation.cancel());

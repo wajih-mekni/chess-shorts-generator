@@ -11,6 +11,9 @@ const camera = {
     revision: 0,
     finished: Promise.resolve(),
     identity: {x: 0, y: 0, zoom: cameraConfig.wideZoom, rotation: 0},
+    // Commanded absolute target, not the interpolated on-screen pose. Transient
+    // motion never writes this value or this element's transform.
+    pose: {x: 0, y: 0, zoom: cameraConfig.wideZoom, rotation: 0},
 
     transform(pose) {
         return "translate(" + pose.x + "px," + pose.y + "px) rotate(" +
@@ -37,7 +40,8 @@ const camera = {
         this.revision++;
         const from = getComputedStyle(board).transform;
         if (this.animation) this.animation.cancel();
-        const target = this.transform(this.bounded({...this.identity, ...pose}));
+        this.pose = this.bounded({...this.identity, ...pose});
+        const target = this.transform(this.pose);
         board.style.transform = target;
         if (duration <= 0) {
             this.animation = null;
@@ -64,6 +68,7 @@ const camera = {
         this.revision++;
         if (this.animation) this.animation.cancel();
         this.animation = null;
+        this.pose = {...this.identity};
         board.style.transform = this.transform(this.identity);
         board.style.transformOrigin = "center center";
         this.finished = Promise.resolve();
@@ -130,10 +135,12 @@ function camera_focus_destination(destination_square, shot_type = "K") {
     const xs=corners.map(p=>p.x), ys=corners.map(p=>p.y);
     const minX=Math.min(...xs), maxX=Math.max(...xs);
     const minY=Math.min(...ys), maxY=Math.max(...ys);
-    const limit=cameraConfig.viewportSize/2;
+    // Reserve room for simultaneous bounded transient transforms. LEGACY has a
+    // zero margin and therefore preserves the previous destination framing.
+    const limit=cameraConfig.viewportSize/2 - (cameraConfig.transient?.framingMargin || 0);
     // Bound zoom by both the rotated box size and available translation.
     let zoom=Math.min(shot.zoom, cameraConfig.maxZoom,
-        cameraConfig.viewportSize/(maxX-minX), cameraConfig.viewportSize/(maxY-minY));
+        2*limit/(maxX-minX), 2*limit/(maxY-minY));
     for (const value of [minX,maxX,minY,maxY]) {
         if (value) zoom=Math.min(zoom,(limit+cameraConfig.maxTranslation)/Math.abs(value));
     }

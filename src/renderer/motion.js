@@ -23,7 +23,8 @@ function pieceMoveKeyframes(from, to, preset) {
     ];
 }
 
-async function animatePieceToSquare(element, square, presetName = motion.defaultPreset) {
+async function animatePieceToSquare(element, square, presetName = motion.defaultPreset,
+                                   onMotion = () => {}) {
     const preset = motion.presets[presetName];
     if (!preset) throw new Error("Unknown movement preset: " + presetName);
     const target = squareToCoords(square);
@@ -36,10 +37,14 @@ async function animatePieceToSquare(element, square, presetName = motion.default
     }
     const previousZ = element.style.zIndex;
     element.style.zIndex = "6";
-    const animation = element.animate(pieceMoveKeyframes(from, to, preset), {
+    const frames = pieceMoveKeyframes(from, to, preset);
+    const animation = element.animate(frames, {
         duration: preset.duration, easing: "linear", fill: "both"
     });
     try {
+        // Timing observer only: no changes to the authored movement or duration.
+        onMotion({animation, duration: preset.duration,
+                  contactOffset: frames[frames.length - 2].offset});
         // Resolve only after the overshoot has settled: sounds/memes use this boundary.
         await animation.finished;
         placePiece(element, square);

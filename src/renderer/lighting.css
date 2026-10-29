@@ -1,0 +1,19 @@
+/* Board-space owners inherit the camera; viewport-space owners are its siblings.
+   All are clipped by .board-area and are separate from actor transforms. */
+.lighting-layer { position:absolute; inset:0; pointer-events:none; }
+.lighting-under { z-index:2; }
+.lighting-over { z-index:8; }
+.lighting-viewport { z-index:11; }
+.light-primitive { position:absolute; pointer-events:none; opacity:0; box-sizing:border-box; }
+.light-glow { border-radius:50%; background:radial-gradient(circle, var(--light-core) 0%, var(--light-color) 25%, transparent 68%); }
+.light-square { background:var(--light-color); box-shadow:inset 0 0 22px var(--light-core),0 0 28px var(--light-color); }
+.light-ring { border-style:solid; border-color:var(--light-color); border-radius:50%; box-shadow:0 0 10px var(--light-color),inset 0 0 8px var(--light-color); }
+.light-flash { inset:0; background:var(--light-core); }
+.light-wash { inset:0; background:var(--light-color); }
+.light-vignette { inset:0; background:radial-gradient(ellipse,transparent 35%,#05090c 100%); }
+.light-particle { background:var(--light-core); box-shadow:0 0 5px var(--light-color); }
+.light-dust, .light-spark { border-radius:50%; }
+.lighting-reference {
+    --chess-canvas:${LIGHT_CANVAS};
+    --chess-backing:${LIGHT_BACKING};
+}

@@ -19,16 +19,19 @@ ${styles}
 <body>
 
 
-<div class="short-canvas">
+<div class="short-canvas ${theme_class}">
 
     <div class="board-area">
 
         <div class="board-container">
+        <div class="camera-transient" id="cameraReframe">
+        <div class="camera-transient" id="cameraImpact">
+        <div class="camera-transient" id="cameraHero">
         <div class="board-camera" id="board">
 
             <img
                 class="board-background"
-                src="../assets/board.svg"
+                src="${board_image}"
             >
 
             <div id="fromHighlight" class="move-highlight from-highlight" aria-hidden="true"></div>
@@ -48,6 +51,10 @@ ${styles}
             <div id="annotationBadge" class="annotation-badge" aria-hidden="true"></div>
             <div id="annotationPill" class="annotation-pill" aria-hidden="true"></div>
 
+        </div>
+
+        </div>
+        </div>
         </div>
 
     </div>

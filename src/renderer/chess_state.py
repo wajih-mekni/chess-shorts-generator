@@ -122,12 +122,17 @@ def compile_sequence(board, annotated_line, default_pause=2):
         to_square = chess.square_name(move.to_square)
 
         move_data = {
+            "piece_kind": chess.piece_name(temp_board.piece_at(move.from_square).piece_type),
+            "piece_color": "white" if temp_board.turn == chess.WHITE else "black",
             "camera_directive": camera_directive,
             "pause": pause,
             "start_meme": start_meme,
             "from": from_square,
             "to": to_square,
             "capture": None,
+            "captured_kind": None,
+            "captured_color": None,
+            "en_passant": temp_board.is_en_passant(move),
             "promotion": None,
             "rook_from": None,
             "rook_to": None,
@@ -146,6 +151,10 @@ def compile_sequence(board, annotated_line, default_pause=2):
                 move_data["capture"] = chess.square_name(capture_square)
             else:
                 move_data["capture"] = to_square
+            victim = temp_board.piece_at(chess.parse_square(move_data["capture"]))
+            if victim:
+                move_data["captured_kind"] = chess.piece_name(victim.piece_type)
+                move_data["captured_color"] = "white" if victim.color == chess.WHITE else "black"
 
         # Castling
         if temp_board.is_castling(move):
@@ -161,6 +170,7 @@ def compile_sequence(board, annotated_line, default_pause=2):
 
         temp_board.push(move)
         move_data["check"] = temp_board.is_check()
+        move_data["checkmate"] = temp_board.is_checkmate()
         move_data["check_targets"] = []
         move_data["check_paths"] = []
         move_data["checker_squares"] = []
