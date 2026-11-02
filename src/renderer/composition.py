@@ -10,6 +10,7 @@ from .timing import TIMING_PROFILE, timing_config
 from .choreography import CHOREOGRAPHY_PROFILE, choreography_config
 from .reactions import REACTION_PROFILE, reaction_config
 from .lighting import LIGHTING_PROFILE, lighting_config
+from .directing import directing_config
 from urllib.parse import quote
 
 ASSETS = Path(__file__).parent
@@ -18,11 +19,20 @@ RUNTIME_ORDER = ("board", "camera", "camera_impulses", "motion", "choreography",
                  "media", "audio", "director", "scheduler", "timeline")
 
 
-def render_scene(scene, *, meme_path=None, meme_volume=0.25,
+def render_scene(scene, *, meme_mode="fixed", layout_mode="safe", meme_path=None, meme_volume=0.25,
                  meme_comment_text=None, music_path=None, music_volume=0.8,
                  movement_preset="NORMAL_MOVE", camera_enabled=None,
-                 timing_profile=TIMING_PROFILE, choreography_profile=CHOREOGRAPHY_PROFILE,
-                 reaction_profile=REACTION_PROFILE, lighting_profile=LIGHTING_PROFILE):
+                 timing_profile=None, choreography_profile=None,
+                 reaction_profile=None, lighting_profile=None, directing_profile='LEGACY'):
+    if meme_mode not in ("fixed", "off"):
+        raise ValueError(f"Unsupported meme mode: {meme_mode!r}; expected 'fixed' or 'off'")
+    directing = directing_config(directing_profile)
+    def profile(value, legacy):
+        return value if value is not None else ('REFERENCE' if directing['enabled'] else legacy)
+    timing_profile = profile(timing_profile, TIMING_PROFILE)
+    choreography_profile = profile(choreography_profile, CHOREOGRAPHY_PROFILE)
+    reaction_profile = profile(reaction_profile, REACTION_PROFILE)
+    lighting_profile = profile(lighting_profile, LIGHTING_PROFILE)
     presets = movement_presets()
     if movement_preset not in presets:
         raise ValueError(f"Unknown movement preset: {movement_preset}")
@@ -31,6 +41,8 @@ def render_scene(scene, *, meme_path=None, meme_volume=0.25,
     lighting = lighting_config(lighting_profile)
     for event in scene.get("timeline", []):
         move = event.get("move", {})
+        if 'director_tier' in move and move['director_tier'] not in directing['tiers']:
+            raise ValueError(f"Unknown director tier: {move['director_tier']}")
         name = move.get("effect_preset", lighting["defaultPreset"])
         if name != "NONE" and name not in lighting["presets"]:
             raise ValueError(f"Unknown effect preset: {name}")
@@ -56,6 +68,13 @@ def render_scene(scene, *, meme_path=None, meme_volume=0.25,
         f'<div class="meme-comment">{escape(meme_comment_text)}</div>'
         if meme_comment_text else ""
     )
+    meme_layer = (
+        '<div class="reaction-area">\n'
+        f'        {meme_video}\n'
+        f'        {meme_comment}\n'
+        '    </div>'
+        if meme_mode == "fixed" else ""
+    )
 
     music_audio = (
         f'<audio id="backgroundMusic" src="{escape(music_path, quote=True)}" '
@@ -64,7 +83,11 @@ def render_scene(scene, *, meme_path=None, meme_volume=0.25,
     )
 
 
-    values = {name: value for name, value in vars(layout).items() if name.isupper()}
+    values = layout.layout_config(meme_mode, layout_mode)
+    # Use the inscribed safe square for the existing destination camera solver.
+    # Portrait height provides extra effect room, never an unsafe horizontal zoom.
+    camera_viewport = ((min(values['VIEWPORT_WIDTH'], values['VIEWPORT_HEIGHT']) -
+                        2 * values['CAMERA_EFFECT_MARGIN']) / values['BOARD_SCALE'])
     theme = lighting['theme']
     board_image = '../assets/board.svg'
     if lighting['enabled']:
@@ -80,9 +103,11 @@ def render_scene(scene, *, meme_path=None, meme_volume=0.25,
     values.update(CAMERA_OVERSCAN=CAMERA_OVERSCAN, SQUARE_SIZE=layout.BOARD_LOGICAL_SIZE / 8,
                   CAPTION_RIGHT=max(24, layout.MEME_X + layout.MEME_WIDTH -
                                     (layout.CANVAS_WIDTH - layout.RIGHT_UI_SAFE_AREA)),
-                  meme_video=meme_video, meme_comment=meme_comment, music_audio=music_audio)
+                  meme_layer=meme_layer, music_audio=music_audio)
     data = {"scene": scene,
-            "cameraConfig": camera_config(camera_enabled, timing_profile),
+            "directingConfig": directing,
+            "cameraConfig": camera_config(camera_enabled, timing_profile,
+                                          viewport_size=camera_viewport),
             "timingConfig": timing_config(timing_profile),
             "choreographyConfig": choreography,
             "reactionConfig": reactions,
@@ -91,7 +116,9 @@ def render_scene(scene, *, meme_path=None, meme_volume=0.25,
             "media": {"memeVolume": meme_volume, "musicVolume": music_volume},
             "layout": {"squareSize": layout.BOARD_LOGICAL_SIZE / 8,
                        "labelRight": (layout.CANVAS_WIDTH - layout.RIGHT_UI_SAFE_AREA -
-                                      layout.BOARD_X) / layout.BOARD_SCALE}}
+                                      values['BOARD_X']) / values['BOARD_SCALE']}}
+    if meme_mode == 'off' and layout_mode == 'crop':
+        data['cameraConfig']['cropWide'] = True
     # Escape '<' so user content cannot terminate the inline script element.
     runtime = "\n".join("const " + name + " = " + json.dumps(value).replace("<", "\\u003c") + ";"
                         for name, value in data.items())
@@ -105,6 +132,21 @@ const hasMemeTriggers = timeline.some(event =>
     runtime += "\n" + "\n".join((ASSETS / (name + ".js")).read_text() for name in RUNTIME_ORDER)
     runtime += "\ncamera.reset();\ncameraMotion.reset();\ncreatePieces();\n"
     values["runtime"] = runtime
-    values["styles"] = Template((ASSETS / "scene.css").read_text() +
-                                (ASSETS / "lighting.css").read_text()).substitute(values)
+    # Keep scene.css valid standalone CSS; inject computed layout as custom properties.
+    pixel_properties = (
+        "CANVAS_WIDTH", "CANVAS_HEIGHT", "FRAME_X", "FRAME_Y",
+        "VIEWPORT_WIDTH", "VIEWPORT_HEIGHT", "BOARD_OFFSET_X", "BOARD_OFFSET_Y",
+        "BOARD_LOGICAL_SIZE", "CAMERA_OVERSCAN", "SQUARE_SIZE",
+        "MEME_X", "MEME_Y", "MEME_WIDTH", "MEME_HEIGHT", "CAPTION_RIGHT",
+    )
+    css_properties = {
+        "--" + key.lower().replace("_", "-"): f"{values[key]}px"
+        for key in pixel_properties
+    }
+    css_properties.update({"--board-scale": str(values["BOARD_SCALE"]),
+                           "--meme-fit": values["MEME_FIT"]})
+    layout_styles = ":root {\n" + "".join(
+        f"    {key}: {value};\n" for key, value in css_properties.items()) + "}\n"
+    values["styles"] = (layout_styles + (ASSETS / "scene.css").read_text() +
+                        Template((ASSETS / "lighting.css").read_text()).substitute(values))
     return Template((ASSETS / "scene.html").read_text()).substitute(values)

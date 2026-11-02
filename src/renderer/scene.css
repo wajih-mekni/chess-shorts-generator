@@ -7,7 +7,7 @@ body {
     min-height: 100vh;
 
     display: flex;
-    justify-content: center;
+    justify-content: flex-start;
     align-items: flex-start;
 }
 
@@ -15,9 +15,10 @@ body {
 .short-canvas {
     position: relative;
 
-    width: ${CANVAS_WIDTH}px;
-    height: ${CANVAS_HEIGHT}px;
+    width: var(--canvas-width);
+    height: var(--canvas-height);
     flex-shrink: 0;
+    margin-inline: auto;
 
     background: var(--chess-canvas, linear-gradient(155deg, #f2e4ce 0%, #d9bb92 65%, #c8a57e 100%));
 
@@ -30,10 +31,10 @@ body {
     overflow: hidden;
     isolation: isolate;
     position: absolute;
-    left: ${FRAME_X}px;
-    top: ${FRAME_Y}px;
-    width: ${BOARD_FRAME_SIZE}px;
-    height: ${BOARD_FRAME_SIZE}px;
+    left: var(--frame-x);
+    top: var(--frame-y);
+    width: var(--viewport-width);
+    height: var(--viewport-height);
     box-sizing: border-box;
     border-radius: 22px;
     background: var(--chess-backing, linear-gradient(145deg, #fff1da, #dcb98a));
@@ -43,11 +44,11 @@ body {
 
 .board-container {
     position: absolute;
-    left: ${FRAME_PADDING}px;
-    top: ${FRAME_PADDING}px;
-    width: ${BOARD_LOGICAL_SIZE}px;
-    height: ${BOARD_LOGICAL_SIZE}px;
-    transform: scale(${BOARD_SCALE});
+    left: var(--board-offset-x);
+    top: var(--board-offset-y);
+    width: var(--board-logical-size);
+    height: var(--board-logical-size);
+    transform: scale(var(--board-scale));
     transform-origin: top left;
 }
 
@@ -71,7 +72,7 @@ body {
 .board-camera::before {
     content: "";
     position: absolute;
-    inset: -${CAMERA_OVERSCAN}px;
+    inset: calc(-1 * var(--camera-overscan));
     background: var(--chess-backing, linear-gradient(145deg, #fff1da, #dcb98a));
     pointer-events: none;
 }
@@ -79,8 +80,8 @@ body {
 .board-background {
     position: absolute;
 
-    width: ${BOARD_LOGICAL_SIZE}px;
-    height: ${BOARD_LOGICAL_SIZE}px;
+    width: var(--board-logical-size);
+    height: var(--board-logical-size);
 
     left: 0;
     top: 0;
@@ -92,8 +93,8 @@ body {
 .piece {
     position: absolute;
 
-    width: ${SQUARE_SIZE}px;
-    height: ${SQUARE_SIZE}px;
+    width: var(--square-size);
+    height: var(--square-size);
 
     z-index: 5;
 
@@ -112,8 +113,8 @@ body {
 /* Effects use one shared color, with independent layer opacity. */
 .move-highlight {
     position: absolute;
-    width: ${SQUARE_SIZE}px;
-    height: ${SQUARE_SIZE}px;
+    width: var(--square-size);
+    height: var(--square-size);
     z-index: 3;
     display: none;
     pointer-events: none;
@@ -132,8 +133,8 @@ body {
 
 .check-target {
     position: absolute;
-    width: ${SQUARE_SIZE}px;
-    height: ${SQUARE_SIZE}px;
+    width: var(--square-size);
+    height: var(--square-size);
     display: none;
     background: #ff3b30;
 }
@@ -141,8 +142,8 @@ body {
 .arrow-layer {
     position: absolute;
     inset: 0;
-    width: ${BOARD_LOGICAL_SIZE}px;
-    height: ${BOARD_LOGICAL_SIZE}px;
+    width: var(--board-logical-size);
+    height: var(--board-logical-size);
     z-index: 4;
     display: none;
     pointer-events: none;
@@ -204,10 +205,10 @@ body {
 /* Reaction / meme */
 .reaction-area {
     position: absolute;
-    left: ${MEME_X}px;
-    top: ${MEME_Y}px;
-    width: ${MEME_WIDTH}px;
-    height: ${MEME_HEIGHT}px;
+    left: var(--meme-x);
+    top: var(--meme-y);
+    width: var(--meme-width);
+    height: var(--meme-height);
     border-radius: 18px;
     box-shadow: 0 8px 24px rgba(91, 57, 25, 0.16);
     overflow: hidden;
@@ -225,17 +226,17 @@ body {
 
 
 .reaction-area video {
-    display: block;
-    width: 100%;
-    height: 100%;
-    object-fit: ${MEME_FIT};
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: var(--meme-fit, contain);
 }
 
 .meme-comment {
     position: absolute;
     top: 24px;
     left: 24px;
-    right: ${CAPTION_RIGHT}px;
+    right: var(--caption-right);
     z-index: 10;
     width: auto;
     box-sizing: border-box;
@@ -246,6 +247,12 @@ body {
     font: 700 36px/1.25 Arial, sans-serif;
     text-align: center;
     overflow-wrap: anywhere;
+    /* Keep long comments inside the reaction panel and leave video visible. */
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    max-height: calc(100% - 48px);
+    overflow: hidden;
     box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
     pointer-events: none;

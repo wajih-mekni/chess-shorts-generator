@@ -92,15 +92,16 @@ const cameraMotion = {
         ], total);
     },
 
-    // Stage 2 exposes an explicit close-shot accent, not automatic capture logic.
-    impact(move) {
-        if (!this.enabled || move.camera_directive !== "L") return Promise.resolve();
+    // Existing close-shot accent; the director can select a bounded intensity.
+    impact(move, strength = null) {
+        if (!this.enabled || (strength === null && move.camera_directive !== "L")) return Promise.resolve();
+        const intensity = Math.max(0, Math.min(1, strength ?? 1));
         const config = cameraConfig.transient.impact;
         const direction = this.direction(move);
         const accent = (offset, amount) => this.frame(offset,
-            direction.x * config.translation * amount,
-            direction.y * config.translation * amount, 1 + config.zoom * Math.abs(amount),
-            direction.turn * config.rotation * amount, cameraConfig.transient.easing);
+            direction.x * config.translation * amount * intensity,
+            direction.y * config.translation * amount * intensity, 1 + config.zoom * Math.abs(amount) * intensity,
+            direction.turn * config.rotation * amount * intensity, cameraConfig.transient.easing);
         return this.play("impact", [
             accent(0, 0), accent(config.peakAt, 1), accent(config.reboundAt, -config.rebound),
             accent(config.settleAt, config.settle), accent(1, 0)

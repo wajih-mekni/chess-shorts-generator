@@ -4,8 +4,9 @@ let playing = false;
 let hasPlayed = false;
 
 // Timeline owns ordering; renderers own DOM updates and visual primitives.
-async function animateMove(move) {
-    const plan = buildMovePlan(move);
+async function animateMove(source, context) {
+    const plan = buildMovePlan(source, context);
+    const move = plan.move;
     const schedule = timelineScheduler.begin(move, plan);
     const reactions = reactionSystem.begin(move, schedule, plan.reactions);
     const lighting = lightingSystem.begin(move, schedule, plan.lighting);
@@ -25,7 +26,7 @@ async function animateMove(move) {
         if (plan.pieceDelay > 0) await schedule.wait(plan.pieceDelay);
         const contact = () => {
             if (schedule.cue("contact") && plan.impulse) {
-                schedule.track(cameraMotion.impact(move));
+                schedule.track(cameraMotion.impact(move, plan.impactStrength));
             }
         };
         schedule.cue("launch");
@@ -53,6 +54,7 @@ async function animateMove(move) {
         }
         await schedule.finish();
         schedule.cue("complete");
+        if(context)Object.assign(context,plan.nextContext);
     } catch (error) {
         cameraMotion.reset();
         camera.reset();
@@ -65,16 +67,17 @@ async function animateMove(move) {
 }
 
 const timelineHandlers = {
-    move: event => animateMove(event.move),
+    move: (event, context) => animateMove(event.move, context),
     meme: () => startMemeVideo(),
     camera: event => camera.apply(event.preset, event.from, event.to)
 };
 
 async function runTimeline(events) {
+    const context = {shot:'J',focus:null};
     for (const event of events) {
         const handler = timelineHandlers[event.type];
         if (!handler) throw new Error("Unknown timeline event: " + event.type);
-        await handler(event);
+        await handler(event, context);
     }
 }
 

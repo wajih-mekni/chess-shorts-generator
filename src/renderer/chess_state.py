@@ -1,6 +1,7 @@
 """Pure chess compilation: no DOM, media, or output side effects."""
 import re
 import chess
+from .directing import CHOREOGRAPHY_ALIASES
 
 def square_to_coords(square_name: str):
     file_index = ord(square_name[0]) - ord("a")
@@ -61,6 +62,30 @@ def parse_camera_directive(token: str):
     return match[1] + match[3], match[2]
 
 
+def parse_choreography_directive(token: str):
+    """Strip a single ~alias before existing SAN/camera/annotation parsing."""
+    if '~' not in token:
+        return token, None
+    matches = list(re.finditer(r'~([a-z][a-z0-9-]*)(?=$|[@!?+(#])', token))
+    if token.count('~') != 1 or len(matches) != 1:
+        raise ValueError(f'Invalid choreography directive in {token!r}; use one ~alias')
+    match = matches[0]
+    name = match[1]
+    if name not in CHOREOGRAPHY_ALIASES:
+        raise ValueError(f'Unknown choreography alias ~{name}; use ' + ', '.join(CHOREOGRAPHY_ALIASES))
+    return token[:match.start()] + token[match.end():], CHOREOGRAPHY_ALIASES[name]
+
+
+def parse_tier_directive(token: str):
+    """Strip one ^N before other suffixes so their existing ordering still works."""
+    if '^' not in token:
+        return token, None
+    match = re.search(r'\^N(?=$|[~@!?+(#])', token)
+    if token.count('^') != 1 or match is None or match.start() == 0:
+        raise ValueError(f'Invalid director tier directive in {token!r}; use one ^N')
+    return token[:match.start()] + token[match.end():], 'NORMAL'
+
+
 def parse_move_token(token: str, default_pause: float):
     """Separate SAN from annotations and trailing timing/meme metadata."""
     pause = None
@@ -113,7 +138,10 @@ def compile_sequence(board, annotated_line, default_pause=2):
             timeline.append({"type": "meme"})
             continue
 
+        token, director_tier = parse_tier_directive(token)
+        token, choreography_preset = parse_choreography_directive(token)
         token, camera_directive = parse_camera_directive(token)
+        pause_explicit = bool(re.search(r'\(\d+(?:\.\d+)?s\)', token))
         san, annotation, pause, start_meme = parse_move_token(token, default_pause)
 
         move = temp_board.parse_san(san)
@@ -126,6 +154,7 @@ def compile_sequence(board, annotated_line, default_pause=2):
             "piece_color": "white" if temp_board.turn == chess.WHITE else "black",
             "camera_directive": camera_directive,
             "pause": pause,
+            "pause_explicit": pause_explicit,
             "start_meme": start_meme,
             "from": from_square,
             "to": to_square,
@@ -140,6 +169,10 @@ def compile_sequence(board, annotated_line, default_pause=2):
             "annotation_style": ANNOTATIONS.get(annotation, {}).get("style"),
             "annotation_label": ANNOTATIONS.get(annotation, {}).get("label"),
         }
+        if choreography_preset:
+            move_data['choreography_preset'] = choreography_preset
+        if director_tier:
+            move_data['director_tier'] = director_tier
 
         # Normal capture
         if temp_board.is_capture(move):

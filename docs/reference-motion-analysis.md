@@ -1,6 +1,6 @@
 # Reference board motion: findings and implementation plan
 
-Analysis of `assets/references/Reference.mp4`, **28 October 2026**. The original analysis changed no renderer behavior. Stages 1–2 were subsequently implemented on **29 October 2026**; see [implementation and tuning](timing-camera.md). Stage 3 is implemented; see [piece choreography](piece-choreography.md). Stage 4 is implemented; see [reactions and impact cues](reactions.md). Stage 5 is implemented; see [lighting and particles](lighting-particles.md). Stage 6 remains unimplemented. The goal is a reusable directing system, not a reconstruction of the reference game.
+Analysis of `assets/references/Reference.mp4`, **28 October 2026**. The original analysis changed no renderer behavior. Stages 1–2 were subsequently implemented on **29 October 2026**; see [implementation and tuning](timing-camera.md). Stage 3 is implemented; see [piece choreography](piece-choreography.md). Stage 4 is implemented; see [reactions and impact cues](reactions.md). Stage 5 is implemented; see [lighting and particles](lighting-particles.md). Stage 6 is implemented; see [automatic directing and production workflow](automatic-directing.md). The goal is a reusable directing system, not a reconstruction of the reference game.
 
 ## Evidence and limits
 

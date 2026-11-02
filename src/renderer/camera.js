@@ -76,7 +76,10 @@ const camera = {
 
     directMove(move) {
         if (!cameraConfig.enabled || !move.camera_directive) return this.finished;
-        if (move.camera_directive === "J") return camera_reset();
+        if (move.camera_directive === "J") {
+            if (cameraConfig.cropWide) return this.to(camera_wide_destination(move.to), cameraConfig.wideDuration);
+            return camera_reset();
+        }
         return this.to(camera_focus_destination(move.to, move.camera_directive),
                        cameraConfig.shots[move.camera_directive].duration);
     },
@@ -101,6 +104,19 @@ function camera_focus(square) { return camera.to(camera.target(square)); }
 function camera_push(square) { return camera.to(camera.target(square, true), cameraConfig.shots.L.duration); }
 function camera_pull_back() { return camera.to(camera.identity, cameraConfig.wideDuration); }
 function camera_reset() { return camera.to(camera.identity, cameraConfig.wideDuration); }
+
+// Crop layouts retain wide scale but pan just enough to keep the destination
+// square inside the existing transient-safe framing area. Reset stays centered.
+function camera_wide_destination(square) {
+    const point = squareToCoords(square);
+    const limit = Math.max(0, cameraConfig.viewportSize / 2 -
+        (cameraConfig.transient?.framingMargin || 0) - squareSize / 2);
+    const pan = index => {
+        const center = (index - 3.5) * squareSize;
+        return Math.max(-limit, Math.min(limit, center)) - center;
+    };
+    return {...camera.identity, x:pan(point.x), y:pan(point.y)};
+}
 async function camera_pan(square_a, square_b) {
     const first = camera_focus(square_a);
     const revision = camera.revision;

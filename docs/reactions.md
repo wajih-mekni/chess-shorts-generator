@@ -1,8 +1,9 @@
 # Stage 4 — Reactions and impact cues
 
 Stage 4 adds independent victim exits and recoverable king reactions. It keeps
-the Stage 1 scheduler, Stage 2 camera and Stage 3 choreography. Lighting,
-particles and Stage 6 tactical recipe selection remain unimplemented.
+the Stage 1 scheduler, Stage 2 camera and Stage 3 choreography. Later stages add
+[lighting/particles](lighting-particles.md) and
+[automatic recipe selection](automatic-directing.md) without replacing these primitives.
 
 ## Run the browser demo
 

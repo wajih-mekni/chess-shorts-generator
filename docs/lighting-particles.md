@@ -1,8 +1,9 @@
 # Stage 5 — Lighting and particles
 
 Stage 5 adds a reference-like neutral theme and independent, finite lighting and
-particle primitives. Stages 1–4 remain intact. Stage 6 automatic tactical
-selection/pacing is not implemented.
+particle primitives. Stages 1–4 remain intact. This guide describes explicit
+Stage 5 controls; the production workflow now composes them through
+[Stage 6 automatic directing](automatic-directing.md).
 
 ## Browser demo
 

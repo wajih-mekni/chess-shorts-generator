@@ -90,7 +90,7 @@ def _transient_config(enabled, viewport_size):
                 **tracks)
 
 
-def camera_config(enabled=None, profile="REFERENCE"):
+def camera_config(enabled=None, profile="REFERENCE", *, viewport_size=None):
     from .layout import BOARD_FRAME_SIZE, BOARD_SCALE
     if profile not in {"LEGACY", "REFERENCE"}:
         raise ValueError(f"Unknown camera profile: {profile}")
@@ -101,7 +101,8 @@ def camera_config(enabled=None, profile="REFERENCE"):
     wide_duration = REFERENCE_CAMERA_WIDE_DURATION if reference else CAMERA_WIDE_DURATION
     medium_rotation = REFERENCE_CAMERA_MEDIUM_ROTATION if reference else CAMERA_MEDIUM_ROTATION
     close_rotation = REFERENCE_CAMERA_CLOSE_ROTATION if reference else CAMERA_CLOSE_ROTATION
-    viewport_size = BOARD_FRAME_SIZE / BOARD_SCALE
+    if viewport_size is None:
+        viewport_size = BOARD_FRAME_SIZE / BOARD_SCALE
     return dict(enabled=enabled, profile=profile,
                 duration=medium_duration, wideDuration=wide_duration,
                 brilliantPreHold=BRILLIANT_PRE_HOLD, brilliantPostHold=BRILLIANT_POST_HOLD,

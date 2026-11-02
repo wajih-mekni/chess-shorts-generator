@@ -14,6 +14,7 @@ from src.renderer.timing import timing_config
 from src.renderer.choreography import choreography_config
 from src.renderer.reactions import reaction_config
 from src.renderer.lighting import lighting_config
+from src.renderer.directing import directing_config
 
 
 class TimingPlanTests(unittest.TestCase):
@@ -71,7 +72,8 @@ if (input.timingConfig.profile === 'REFERENCE') {
                 data = dict(squareSize=135, motion=dict(presets=movement_presets(),
                             defaultPreset="NORMAL_MOVE"), cameraConfig=camera_config(profile=profile),
                             timingConfig=timing_config(profile), choreographyConfig=choreography_config(),
-                            reactionConfig=reaction_config(), lightingConfig=lighting_config())
+                            reactionConfig=reaction_config(), lightingConfig=lighting_config(),
+                            directingConfig=directing_config())
                 subprocess.run(["node", "-e", script], input=json.dumps(data), text=True,
                                cwd=ROOT, check=True)
 
