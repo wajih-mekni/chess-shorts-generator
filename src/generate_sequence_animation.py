@@ -21,20 +21,65 @@ except ImportError:
 ROOT = Path(__file__).resolve().parents[1]
 DEMO_FEN = chess.STARTING_FEN
 # Legal Italian/Fried Liver line. Annotations are artistic input, not engine scores.
-DEMO_SEQUENCE = ('Qxc5?!(0.5s) Re5!!@J(1.2s) Qxe5@J Ka3!!(0.5s) Qd6+@J(0.5s) b4+(0.5s) Qxb4+(0.5s) Qxb4#@K')
-#'Qxh6+!! Kxh6~sweep Rh4+ Kg5?!@J f4+@L Kxh4?? g3+ Kh3 Bf1#@K'
-
-
-START_FEN = "1Q2R3/2r1q3/p6p/k1P3p1/3p4/1P1P2P1/1KP4P/8 b - - 0 1"
+DEMO_SEQUENCE = 'Bd3+(pm:b1:YesYes,hold=true,shape=circle,audio=true)(0.3s) Ka2^N(0.3s) Bc4+^N(0.3s) Kb1^N(0.3s) Bb3!^N(pm-remove:b1)(pm:b1:WtfIsGoingOnHere,dur=3,shape=circle,audio=true)(pm:h4:SusDog,dur=3,shape=circle,audio=true)(0.3s) a2^N Kg5!^N Kc1^N(pm:g5:HikaruLaugh,dur=9,shape=circle,audio=true) Kg4+!^N Kb1^N Kf4!^N Kc1^N(pm:c1:MonkeyCry,hold=true,shape=circle,audio=true) Ke4+!^N Kb1^N Ke3!^N Kc1^N Kd3+!^N Kb1^N Bc2#'
+START_FEN = "8/8/7B/8/2B4K/p7/1p6/bk6 w - - 0 1"
 SEQUENCE = DEMO_SEQUENCE
 OUTPUT_PATH = ROOT / 'output/sequence_demo.html'
-MEME_MODE = "fixed"  # "fixed" or "off"; "piece" is reserved for future support.
+MEME_MODE = "off"  # "fixed" or "off"; "piece" is reserved for future support.
 LAYOUT_MODE = "safe"  # "safe" or "crop" for MEME_MODE="off"; fixed memes keep their layout.
-MEME_PATH = '../assets/memes/YesNo.mp4'  # None disables only the video.
-MEME_VOLUME = .25
+MEME_PATH = '../assets/memes/LevySacTheQueen.mp4'  # None disables only the video.
+# Independent from the existing reaction panel. Register local paths once here.
+PIECE_MEME_MODE = "on"
+
+INITIAL_PIECE_MEMES = []
+
+PIECE_MEMES = {
+    "YesYes": {
+        "src": "assets/memes/meme_source.mp4",
+        "type": "video",
+    },
+
+    "HikaruLaugh": {
+        "src": "assets/memes/hikaruLaughExecuseme.mp4",
+        "type": "video",
+    },
+
+    "MonkeyCry": {
+        "src": "assets/memes/MonkeyCry.mp4",
+        "type": "video",
+    },
+
+    "WaitAMinute": {
+        "src": "assets/memes/WaitAMinute.mp4",
+        "type": "video",
+    },
+
+    "SusDog": {
+        "src": "assets/memes/SusDog.mp4",
+        "type": "video",
+    },
+
+    "CR7": {
+        "src": "assets/memes/Cr7.mp4",
+        "type": "video",
+    },
+
+    "HikaruFace": {
+        "src": "assets/memes/piece_meme_demo.png",
+        "type": "image",
+    },
+    "WtfIsGoingOnHere": {
+    "src": "assets/memes/WtfIsGoingOnHere.mp4",
+    "type": "video",
+},
+}
+
+MEME_VOLUME = .35
 MEME_COMMENT = ''
 MUSIC_PATH = None
 MUSIC_VOLUME = .8
+BRILLIANT_MODE = "standard"  # "aggressive" boosts !!; ^A forces it per move, ^N stays NORMAL.
+INITIAL_DELAY = 0.0  # Seconds to show the starting board before the sequence (e.g. 2.5).
 DEFAULT_PAUSE = 2  # LEGACY fallback only; AUTO uses tier pacing unless (Xs) is authored.
 
 
@@ -52,6 +97,9 @@ DEFAULT_PAUSE = 2  # LEGACY fallback only; AUTO uses tier pacing unless (Xs) is 
 #
 #   !       Tactical / important move
 #   !!      HERO / brilliant move
+#   !!^A    Existing aggressive HERO
+#   !!^VA   Very aggressive HERO: 720-degree spin + zoom + aggressive rocking
+#   !!^N    NORMAL override
 #   ?       Negative/danger treatment
 #   ??      Strong negative/danger treatment
 #   !?      Interesting / tension
@@ -258,12 +306,18 @@ DEFAULT_PAUSE = 2  # LEGACY fallback only; AUTO uses tier pacing unless (Xs) is 
 #
 # ============================================================
 
-def generate(output=OUTPUT_PATH, *, start_fen=None, sequence=None, directing_profile=DIRECTING_PROFILE):
+def generate(output=OUTPUT_PATH, *, start_fen=None, sequence=None, directing_profile=DIRECTING_PROFILE, brilliant_mode=None, initial_delay=None, piece_meme_mode=None, initial_piece_memes=None):
     board = chess.Board(START_FEN if start_fen is None else start_fen)
-    scene = compile_sequence(board, SEQUENCE if sequence is None else sequence, DEFAULT_PAUSE)
+    piece_mode = PIECE_MEME_MODE if piece_meme_mode is None else piece_meme_mode
+    scene = compile_sequence(board, SEQUENCE if sequence is None else sequence, DEFAULT_PAUSE,
+                             piece_meme_mode=piece_mode)
     legacy = dict(timing_profile='LEGACY', choreography_profile='LEGACY',
                   reaction_profile='LEGACY', lighting_profile='LEGACY') if directing_profile=='LEGACY' else {}
     html = render_scene(scene, directing_profile=directing_profile, **legacy,
+                        piece_meme_mode=piece_mode, piece_memes=PIECE_MEMES,
+                        initial_piece_memes=INITIAL_PIECE_MEMES if initial_piece_memes is None else initial_piece_memes,
+                        initial_delay=INITIAL_DELAY if initial_delay is None else initial_delay,
+                        brilliant_mode=BRILLIANT_MODE if brilliant_mode is None else brilliant_mode,
                         meme_mode=MEME_MODE, layout_mode=LAYOUT_MODE,
                         meme_path=MEME_PATH, meme_volume=MEME_VOLUME,
                         meme_comment_text=MEME_COMMENT, music_path=MUSIC_PATH, music_volume=MUSIC_VOLUME)
@@ -280,13 +334,14 @@ def main():
     parser.add_argument('--output',type=Path,help='HTML output path')
     parser.add_argument('--demo',action='store_true',help='Use the built-in legal multi-move Stage 6 demo')
     parser.add_argument('--legacy',action='store_true',help='Disable automatic directing and use legacy rendering profiles')
+    parser.add_argument('--brilliant-mode', choices=('standard', 'aggressive'), default=None)
     parser.add_argument('--video',type=Path,help='Also export an MP4 to this path')
     parser.add_argument('--fps',type=int,choices=(30,60),default=30)
     args = parser.parse_args()
     output = args.output or (ROOT/'output/cinematic_demo.html' if args.demo else OUTPUT_PATH)
     generate(output, start_fen=DEMO_FEN if args.demo else None,
              sequence=DEMO_SEQUENCE if args.demo else None,
-             directing_profile='LEGACY' if args.legacy else DIRECTING_PROFILE)
+             directing_profile='LEGACY' if args.legacy else DIRECTING_PROFILE, brilliant_mode=args.brilliant_mode)
     print(f'Created {output}',flush=True)
     if args.video:
         subprocess.run([sys.executable,str(ROOT/'src/export_video.py'),'--html',str(output.resolve()),

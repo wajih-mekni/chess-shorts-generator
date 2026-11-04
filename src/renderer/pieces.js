@@ -31,7 +31,9 @@ function createPieces() {
     });
 }
 
-function resetPieces() {
+function resetPieces(restoreInitialMemes = true) {
+    pieceMemeSystem.reset();
+    cameraMotion.cancel("aggressive");
     lightingSystem.reset();
     reactionSystem.reset();
     pieceGeneration++;
@@ -42,6 +44,7 @@ function resetPieces() {
     renderedPieces.clear();
     pieceBySquare = {};
     createPieces();
+    if (restoreInitialMemes) pieceMemeSystem.initialize();
 }
 
 // The callback is the exact landing boundary used by the timeline for audio/effects.
@@ -60,6 +63,7 @@ async function animatePieceMove(move, onLand = () => {}, onMotion = () => {}, re
         if (retainCapture) retainCapture(victim);
         else {
             renderedPieces.delete(victim);
+            pieceMemeSystem.removeActor(victim);
             victim.remove();
         }
     }

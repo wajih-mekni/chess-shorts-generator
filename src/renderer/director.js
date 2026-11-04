@@ -53,6 +53,12 @@ function buildMovePlan(source, context) {
     const recipe = resolvePieceMotion(move);
     const forcedNormal = directingConfig.enabled && move.director_tier === 'NORMAL';
     const brilliant = move.annotation === "!!" && !forcedNormal;
+    const veryAggressive = directingConfig.enabled && directed.tier === 'HERO' &&
+        move.brilliant_mode === 'very_aggressive';
+    const aggressive = veryAggressive ? directingConfig.veryAggressive : directingConfig.enabled && directed.tier === 'HERO' &&
+        (move.brilliant_mode === 'aggressive' ||
+         (brilliant && (move.brilliant_mode ?? directingConfig.brilliantMode) === 'aggressive'))
+        ? directingConfig.aggressive : null;
     const directive = cameraConfig.enabled ? move.camera_directive : null;
     const reference = timingConfig.profile === "REFERENCE";
     const cameraDuration = !directive ? 0 : directive === "J"
@@ -63,12 +69,15 @@ function buildMovePlan(source, context) {
         : directive === "L" ? timingConfig.cameraLeadClose : timingConfig.cameraLeadNormal;
     // Each recipe supplies its own arrival marker; legacy keyframes are unchanged.
     return Object.freeze({
-        move, tier:directed.tier, nextContext:directed.nextContext,
+        move, tier:directed.tier,
+        nextContext: veryAggressive && aggressive.spinReturnWide && cameraConfig.transient?.enabled
+            ? {shot:'J',focus:null} : directed.nextContext,
         profile: timingConfig.profile, serialCamera: timingConfig.serialCamera,
         cameraDuration, pieceDelay, moveDuration: Math.max(0, recipe.duration),
         choreography: recipe.name,
         reactions: resolveReactions(move),
-        lighting: resolveLighting(move),
+        lighting: resolveLighting(move, aggressive),
+        aggressive,
         contactDelay: Math.max(0, recipe.duration) * recipe.contactOffset,
         holdDuration: Math.max(0, Number(move.pause) || 0) * 1000 +
             (brilliant ? cameraConfig.brilliantPostHold : 0),

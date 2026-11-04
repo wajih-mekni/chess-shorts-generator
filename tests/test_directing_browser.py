@@ -7,7 +7,7 @@ import chess
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
 from playwright.sync_api import sync_playwright
-from src.generate_sequence_animation import DEMO_SEQUENCE
+from test_directing import DEMO_SEQUENCE
 from src.generate_reaction_demo import position
 from src.renderer.chess_state import compile_sequence
 from src.renderer.composition import render_scene
@@ -83,7 +83,7 @@ def main():
                 assert {p['tier'] for p in plans}=={'NORMAL','TACTICAL','HERO'}
                 assert plans[2]['choreography']=='KNIGHT_JUMP' and plans[4]['choreography']=='BISHOP_SWEEP'
                 assert plans[10]['camera']=='L' and plans[10]['hero'] and plans[10]['hold']==2980
-                assert plans[10]['overlap'] and plans[12]['impact']==.55
+                assert plans[10]['overlap'] and plans[12]['impact']==.25
                 assert plans[-1]['camera']=='J'
                 first=page.evaluate('JSON.stringify(effectLog)');firstplans=page.evaluate('JSON.stringify(plans.map(({overlap,...rest})=>rest))')
                 playback(page,scene)

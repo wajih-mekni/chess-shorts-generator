@@ -199,6 +199,7 @@ def export(args):
             && [...document.querySelectorAll('video,audio')].every(m => m.readyState >= 3)
             && [...moveAudio.values()].every(m => m.readyState >= 3)""", timeout=60000)
         page.evaluate("document.fonts.ready")
+        page.evaluate("async () => { if (window.preparePieceMemes) await window.preparePieceMemes(); }")
         if not page.evaluate("async () => (await Promise.all(audioReady)).every(Boolean)"):
             raise RuntimeError("A chess sound failed to preload")
         if errors:

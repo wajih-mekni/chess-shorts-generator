@@ -10,10 +10,11 @@ async function animateMove(source, context) {
     const schedule = timelineScheduler.begin(move, plan);
     const reactions = reactionSystem.begin(move, schedule, plan.reactions);
     const lighting = lightingSystem.begin(move, schedule, plan.lighting);
+    const unbindPieceMeme = pieceMemeSystem.bind(move, schedule, pieceBySquare[move.from]);
     try {
         clearMoveEffects();
         if (move.camera_directive && cameraConfig.enabled) {
-            const transition = camera.directMove(move);
+            const transition = camera.directMove(move, plan.aggressive ? cameraConfig.aggressiveMargin : 0);
             schedule.cue("cameraStart");
             const cameraTrack = schedule.track(Promise.resolve(transition).then(() => {
                 schedule.cue("cameraEnd");
@@ -25,14 +26,18 @@ async function animateMove(source, context) {
         // for the shot to finish. LEGACY preserves camera -> prehold -> piece.
         if (plan.pieceDelay > 0) await schedule.wait(plan.pieceDelay);
         const contact = () => {
-            if (schedule.cue("contact") && plan.impulse) {
-                schedule.track(cameraMotion.impact(move, plan.impactStrength));
-            }
+            if (!schedule.cue("contact")) return;
+            if (plan.impulse) schedule.track(cameraMotion.impact(move, plan.impactStrength,
+                plan.aggressive?.impactStrength ?? 1));
+            if (plan.aggressive && !plan.aggressive.spinTurns)
+                schedule.track(cameraMotion.aggressiveHit(move, plan.aggressive));
         };
         schedule.cue("launch");
         const landed = await animatePieceMove(move, () => {
             contact(); // Instant moves / missed RAF sample: cue once before settling.
             schedule.cue("settled");
+            if (plan.aggressive?.spinTurns)
+                schedule.track(cameraMotion.aggressiveHit(move, plan.aggressive));
             reactions.settled();
             // Preserve the exact existing landing boundary, including castling:
             // audio/check/meme occur before promotion or the rook's movement.
@@ -56,10 +61,12 @@ async function animateMove(source, context) {
         schedule.cue("complete");
         if(context)Object.assign(context,plan.nextContext);
     } catch (error) {
+        pieceMemeSystem.reset();
         cameraMotion.reset();
         camera.reset();
         throw error;
     } finally {
+        unbindPieceMeme();
         lighting.close();
         reactions.close();
         schedule.close();
@@ -96,20 +103,33 @@ async function playSequence() {
         const memeReady = hasMemeTriggers ? prepareDelayedMeme() : null;
         if (!hasMemeTriggers) startMemeVideo();
         startBackgroundMusic();
-        await Promise.all([prepareMoveAudio(), memeReady]);
+        const pieceAudioReady = pieceMemeConfig.enabled ? pieceMemeSystem.unlockAudio() : null;
+        await Promise.all([prepareMoveAudio(), memeReady, pieceAudioReady]);
+
+        if (pieceMemeConfig.enabled) await pieceMemeSystem.prepare();
 
         if (hasPlayed) {
             clearMoveEffects();
-            resetPieces();
+            resetPieces(false);
             camera.reset();
             cameraMotion.reset();
         }
 
+        if (pieceMemeConfig.enabled) pieceMemeSystem.audioActive = true;
+        if (pieceMemeConfig.initial) pieceMemeSystem.initialize();
+
+        // Hold the starting position once per playback, after replay reset and
+        // media preparation. The exporter awaits this promise as part of playback.
+        if (playbackConfig.initialDelayMs > 0) {
+            await new Promise(resolve => setTimeout(resolve, playbackConfig.initialDelayMs));
+        }
         await runTimeline(timeline);
         // The exporter awaits playSequence(): include all transient tails.
         await Promise.all([camera.finished, cameraMotion.finished, reactionSystem.finished,
                            lightingSystem.finished, finishMoveEffects()]);
+        if (pieceMemeConfig.enabled) await pieceMemeSystem.finishAll();
     } finally {
+        pieceMemeSystem.reset();
         hasPlayed = true;
         playing = false;
         playButton.disabled = false;

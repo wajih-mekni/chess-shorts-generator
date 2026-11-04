@@ -85,6 +85,7 @@ class ReactionSession {
         if (!this.victim) return;
         reactionSystem.ghosts.delete(this.victim);
         renderedPieces.delete(this.victim);
+        pieceMemeSystem.removeActor(this.victim);
         this.victim.remove();
         this.victim = null;
     }

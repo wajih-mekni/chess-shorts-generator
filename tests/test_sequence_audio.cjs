@@ -32,7 +32,7 @@ class Audio {
     }
 }
 class Element {
-    constructor() { this.style = {}; this.dataset = {}; this.transitions = []; }
+    constructor() { this.classList = {add() {}, remove() {}}; this.style = {}; this.dataset = {}; this.transitions = []; }
     appendChild() {}
     remove() { this.removed = true; }
     setAttribute() {}

@@ -1,5 +1,5 @@
 // Pure finite particle choreography. The lighting session owns DOM and cleanup.
-function particleDescriptors(name, seed, duration, direction, budget=lightingConfig.maxParticles) {
+function particleDescriptors(name, seed, duration, direction, budget=lightingConfig.maxParticles, multiplier=1) {
     const config = lightingConfig.particles[name];
     if (!config) throw Error('Unknown particle primitive: '+name);
     const random = effectRandom(seed + ':' + name);
@@ -12,7 +12,7 @@ function particleDescriptors(name, seed, duration, direction, budget=lightingCon
     const result = [];
     const range = values => values[0]+random()*(values[1]-values[0]);
     for (let batch=0; batch<batches && result.length<budget; batch++) {
-        for (let i=0;i<config.count && result.length<budget;i++) {
+        for (let i=0;i<Math.ceil(config.count*multiplier) && result.length<budget;i++) {
             const delay = dust ? batch*config.period + random()*config.period*.6 : 0;
             const life = Math.min(config.lifetime, window-delay);
             if (life <= 0) continue;

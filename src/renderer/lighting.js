@@ -85,7 +85,13 @@ class LightingSession {
     emit(name,square,duration) {
         if(this.closed || !this.plan)return;
         if(lightingConfig.particles[name])return this.particles(name,square,duration);
-        const config=lightingConfig.lights[name];
+        const base=lightingConfig.lights[name];
+        const aggressive=this.plan.aggressive;
+        const config=base && aggressive ? {...base,
+            opacity:Math.min(1,base.opacity*aggressive.lightingMultiplier),
+            size:base.size && base.size*aggressive.lightSizeMultiplier,
+            border:base.border && base.border*aggressive.lightSizeMultiplier,
+            endScale:base.endScale && base.endScale*aggressive.lightSizeMultiplier} : base;
         if(!config)throw Error('Unknown lighting primitive: '+name);
         const length=duration ?? config.duration;
         if(!(length>0))return;
@@ -118,7 +124,8 @@ class LightingSession {
     particles(name,square,duration) {
         const direction=reactionDirection(this.move.from,this.move.to);
         const descriptors=particleDescriptors(name,this.plan.seed,duration,direction,
-            Math.max(0,lightingConfig.maxParticles-this.particleCount));
+            Math.max(0,Math.ceil(lightingConfig.maxParticles*(this.plan.aggressive?.particlesMultiplier ?? 1))-this.particleCount),
+            this.plan.aggressive?.particlesMultiplier ?? 1);
         const point=this.point(square);
         for(const descriptor of descriptors) {
             const node=this.node('particle','over',point,descriptor.size);

@@ -90,7 +90,7 @@ def _transient_config(enabled, viewport_size):
                 **tracks)
 
 
-def camera_config(enabled=None, profile="REFERENCE", *, viewport_size=None):
+def camera_config(enabled=None, profile="REFERENCE", *, viewport_size=None, aggressive=None):
     from .layout import BOARD_FRAME_SIZE, BOARD_SCALE
     if profile not in {"LEGACY", "REFERENCE"}:
         raise ValueError(f"Unknown camera profile: {profile}")
@@ -103,7 +103,23 @@ def camera_config(enabled=None, profile="REFERENCE", *, viewport_size=None):
     close_rotation = REFERENCE_CAMERA_CLOSE_ROTATION if reference else CAMERA_CLOSE_ROTATION
     if viewport_size is None:
         viewport_size = BOARD_FRAME_SIZE / BOARD_SCALE
-    return dict(enabled=enabled, profile=profile,
+    transient = _transient_config(bool(enabled and reference), viewport_size)
+    aggressive_margin = 0
+    if aggressive:
+        tracks = [transient[key] for key in ('reframe', 'impact', 'hero')]
+        impact = aggressive['impactStrength']
+        scale = (1 + aggressive['zoom']) * prod(
+            1 + abs(t['zoom']) * (impact if i == 1 else 1) for i, t in enumerate(tracks))
+        angle = radians(aggressive['rotation'] + sum(
+            abs(t['rotation']) * (impact if i == 1 else 1) for i, t in enumerate(tracks)))
+        extent = cos(angle) + sin(angle)
+        translation = (aggressive['shakeTranslation'] + sum(
+            abs(t['translation']) * (impact if i == 1 else 1) for i, t in enumerate(tracks))) * scale * extent
+        safe_half = (viewport_size / 2 - translation) / (scale * extent)
+        if safe_half <= 0:
+            raise ValueError('Aggressive camera parameters leave no safe framing area')
+        aggressive_margin = viewport_size / 2 - safe_half
+    return dict(enabled=enabled, profile=profile, aggressiveMargin=aggressive_margin,
                 duration=medium_duration, wideDuration=wide_duration,
                 brilliantPreHold=BRILLIANT_PRE_HOLD, brilliantPostHold=BRILLIANT_POST_HOLD,
                 easing=CAMERA_EASING,
@@ -112,7 +128,7 @@ def camera_config(enabled=None, profile="REFERENCE", *, viewport_size=None):
                                  duration=medium_duration, rotation=medium_rotation),
                        "L": dict(zoom=CAMERA_CLOSE_ZOOM, region=CAMERA_CLOSE_REGION,
                                  duration=close_duration, rotation=close_rotation)},
-                transient=_transient_config(bool(enabled and reference), viewport_size),
+                transient=transient,
                 viewportSize=viewport_size,
                 maxTranslation=CAMERA_MAX_TRANSLATION, maxZoom=CAMERA_MAX_ZOOM,
                 maxRotation=CAMERA_MAX_ROTATION)

@@ -280,3 +280,27 @@ button {
     cursor: pointer;
 }
 
+
+/* Only active during aggressive rocking; independent of the persistent camera.
+   The oversized backing rotates with the complete chess scene. */
+#cameraAggressive.aggressive-active::before {
+    content: "";
+    position: absolute;
+    inset: calc(-1 * var(--aggressive-overscan));
+    background: var(--chess-backing, linear-gradient(145deg, #fff1da, #dcb98a));
+    pointer-events: none;
+}
+
+/* Only enabled actors gain this containing block; camera and actor depth apply. */
+.piece-meme-host { position: relative; }
+.piece-meme {
+    position: absolute;
+    left: 50%; top: 50%; width: 100%; height: 100%;
+    z-index: 1;
+    pointer-events: none;
+    transform-origin: center;
+}
+.piece-meme-media { display: block; width: 100%; height: 100%; object-fit: contain; }
+.piece-meme-circle { border-radius: 50%; overflow: hidden; }
+.piece-meme-rounded { border-radius: 18%; overflow: hidden; }
+.piece-meme-circle .piece-meme-media, .piece-meme-rounded .piece-meme-media { object-fit: cover; }

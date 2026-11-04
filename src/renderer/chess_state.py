@@ -2,6 +2,7 @@
 import re
 import chess
 from .directing import CHOREOGRAPHY_ALIASES
+from .piece_memes import parse_piece_meme
 
 def square_to_coords(square_name: str):
     file_index = ord(square_name[0]) - ord("a")
@@ -77,13 +78,13 @@ def parse_choreography_directive(token: str):
 
 
 def parse_tier_directive(token: str):
-    """Strip one ^N before other suffixes so their existing ordering still works."""
+    """Strip one ^N/^A/^VA before other suffixes so their existing ordering still works."""
     if '^' not in token:
         return token, None
-    match = re.search(r'\^N(?=$|[~@!?+(#])', token)
+    match = re.search(r'\^(VA|N|A)(?=$|[~@!?+(#])', token)
     if token.count('^') != 1 or match is None or match.start() == 0:
-        raise ValueError(f'Invalid director tier directive in {token!r}; use one ^N')
-    return token[:match.start()] + token[match.end():], 'NORMAL'
+        raise ValueError(f'Invalid director tier directive in {token!r}; use one ^N, ^A or ^VA')
+    return token[:match.start()] + token[match.end():], {'N': 'NORMAL', 'A': 'AGGRESSIVE', 'VA': 'VERY_AGGRESSIVE'}[match[1]]
 
 
 def parse_move_token(token: str, default_pause: float):
@@ -106,8 +107,10 @@ def parse_move_token(token: str, default_pause: float):
 
 
 
-def compile_sequence(board, annotated_line, default_pause=2):
+def compile_sequence(board, annotated_line, default_pause=2, *, piece_meme_mode="on"):
     """Return initial sprites, moves and ordered events without mutating board."""
+    if piece_meme_mode not in ("on", "off"):
+        raise ValueError('PIECE_MEME_MODE must be "on" or "off"')
     pieces = []
 
     for square, piece in board.piece_map().items():
@@ -138,6 +141,7 @@ def compile_sequence(board, annotated_line, default_pause=2):
             timeline.append({"type": "meme"})
             continue
 
+        token, piece_meme = parse_piece_meme(token, enabled=piece_meme_mode == "on")
         token, director_tier = parse_tier_directive(token)
         token, choreography_preset = parse_choreography_directive(token)
         token, camera_directive = parse_camera_directive(token)
@@ -169,10 +173,14 @@ def compile_sequence(board, annotated_line, default_pause=2):
             "annotation_style": ANNOTATIONS.get(annotation, {}).get("style"),
             "annotation_label": ANNOTATIONS.get(annotation, {}).get("label"),
         }
+        if piece_meme is not None:
+            move_data["piece_meme"] = piece_meme
         if choreography_preset:
             move_data['choreography_preset'] = choreography_preset
         if director_tier:
-            move_data['director_tier'] = director_tier
+            move_data['director_tier'] = 'HERO' if director_tier in {'AGGRESSIVE', 'VERY_AGGRESSIVE'} else director_tier
+            if director_tier in {'AGGRESSIVE', 'VERY_AGGRESSIVE'}:
+                move_data['brilliant_mode'] = director_tier.lower()
 
         # Normal capture
         if temp_board.is_capture(move):

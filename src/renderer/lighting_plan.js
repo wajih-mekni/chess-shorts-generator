@@ -1,12 +1,12 @@
 // Pure, explicit selection. Stage 6 may choose these recipes from metadata later.
 // In Stage 5 !!, check and color do not silently select a treatment or extend time.
-function resolveLighting(move) {
+function resolveLighting(move, aggressive = null) {
     const name = move.effect_preset ?? lightingConfig.defaultPreset;
     const palette = move.effect_palette ?? lightingConfig.defaultPalette;
     if (name !== 'NONE' && !lightingConfig.presets[name]) throw Error('Unknown effect preset: ' + name);
     if (!lightingConfig.palettes[palette]) throw Error('Unknown effect palette: ' + palette);
     if (!lightingConfig.enabled || name === 'NONE') return null;
-    return {name, palette, recipe: lightingConfig.presets[name],
+    return {name, palette, aggressive, recipe: lightingConfig.presets[name],
         seed: String(move.effect_seed ?? lightingConfig.seed) + ':' +
             [move.from, move.to, move.piece_kind, move.piece_color].join(':')};
 }

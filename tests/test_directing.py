@@ -13,7 +13,9 @@ from src.renderer.motion import movement_presets
 from src.renderer.choreography import choreography_config
 from src.renderer.reactions import reaction_config
 from src.renderer.lighting import lighting_config
-from src.generate_sequence_animation import DEMO_SEQUENCE
+# Stable test position; production SEQUENCE is intentionally user-editable.
+DEMO_SEQUENCE = ('e4(0.28s) e5 Nf3 Nc6 Bc4 Nf6 Ng5! d5 exd5 '
+                 'Nxd5?! Nxf7!!(meme)(2.8s) Kxf7 Qf3+ Ke8@J')
 
 class DirectingTests(unittest.TestCase):
     def test_inline_aliases_and_order(self):
@@ -58,7 +60,7 @@ const plans=run("(()=>{let c={shot:'J',focus:null};return moves.map(m=>{const p=
 assert.equal(JSON.stringify(data.moves),before,'director mutated logical sequence');
 assert.equal(plans[0].tier,'NORMAL');assert.equal(plans[0].choreography,'LIFT_MOVE');assert.equal(plans[0].holdDuration,280);
 assert.equal(plans[2].choreography,'KNIGHT_JUMP');assert.equal(plans[4].choreography,'BISHOP_SWEEP');
-assert.equal(plans[6].tier,'TACTICAL');assert.equal(plans[6].lighting.palette,'GREEN');assert(plans[6].impulse);assert.equal(plans[6].impactStrength,.55);
+assert.equal(plans[6].tier,'TACTICAL');assert.equal(plans[6].lighting.palette,'GREEN');assert(plans[6].impulse);assert.equal(plans[6].impactStrength,data.directingConfig.tiers.TACTICAL.impact);
 assert.equal(plans[9].lighting.palette,'ORANGE');assert.equal(plans[10].tier,'HERO');assert.equal(plans[10].holdDuration,2980);
 assert.equal(plans[10].lighting.name,'HERO');assert.equal(plans[10].lighting.palette,'CYAN');assert(plans[10].hero);
 assert.equal(plans[10].reactions.capture.name,'CAPTURE_KNOCKBACK');assert.equal(plans[12].lighting.palette,'RED');assert.equal(plans[12].reactions.king.name,'KING_RECOIL');

@@ -24,23 +24,23 @@ const camera = {
         return camera_focus_destination(square, dramatic ? "L" : "K");
     },
 
-    bounded(pose) {
+    bounded(pose, minimumZoom = 1) {
         const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
         return {
             x: clamp(pose.x, -cameraConfig.maxTranslation, cameraConfig.maxTranslation),
             y: clamp(pose.y, -cameraConfig.maxTranslation, cameraConfig.maxTranslation),
-            zoom: clamp(pose.zoom, 1, cameraConfig.maxZoom),
+            zoom: clamp(pose.zoom, minimumZoom, cameraConfig.maxZoom),
             rotation: clamp(pose.rotation, -cameraConfig.maxRotation, cameraConfig.maxRotation)
         };
     },
 
     // Capture the displayed pose before replacing an in-flight animation: no jump.
-    to(pose, duration = cameraConfig.duration) {
+    to(pose, duration = cameraConfig.duration, minimumZoom = 1) {
         if (!cameraConfig.enabled) return Promise.resolve();
         this.revision++;
         const from = getComputedStyle(board).transform;
         if (this.animation) this.animation.cancel();
-        this.pose = this.bounded({...this.identity, ...pose});
+        this.pose = this.bounded({...this.identity, ...pose}, minimumZoom);
         const target = this.transform(this.pose);
         board.style.transform = target;
         if (duration <= 0) {
@@ -63,8 +63,52 @@ const camera = {
         return this.finished;
     },
 
+    // Runs on the persistent shot owner while the separate outer owner spins.
+    // Both use the same animation clock, including pause/seek in the exporter.
+    returnWideDuringSpin(track, config) {
+        const from = getComputedStyle(board).transform;
+        if (this.animation) this.animation.cancel();
+        this.revision++;
+        this.pose = {...this.identity};
+        const target = this.transform(this.identity);
+        board.style.transform = target;
+        const total = cameraMotion.veryAggressiveDuration(config);
+        const zoomDuration = config.spinZoomDuration ?? config.spinDuration;
+        const start = zoomDuration*config.spinReturnWideAt/total;
+        const end = zoomDuration/total;
+        const frames = [{offset:0, transform:from}];
+        if (start > 0) frames.push({offset:start, transform:from, easing:"ease-in-out"});
+        else frames[0].easing = "ease-in-out";
+        frames.push({offset:end, transform:target}, {offset:1, transform:target});
+        const animation = board.animate(frames, {duration:total, fill:'both', easing:'linear'});
+        this.animation = animation;
+        const clock = document.timeline.currentTime;
+        if (clock !== null) {
+            track.animation.startTime = clock;
+            animation.startTime = clock;
+        }
+        // Canceling the outer track must also remove its delayed return, even
+        // when resetPieces() is called without a separate camera.reset().
+        track.cancelReturn = () => {
+            if (this.animation === animation) {
+                animation.cancel();
+                this.animation = null;
+            }
+        };
+        this.finished = animation.finished.catch(error => {
+            if (error.name !== 'AbortError') throw error;
+        }).finally(() => {
+            if (this.animation === animation) {
+                animation.cancel();
+                this.animation = null;
+            }
+        });
+        return this.finished;
+    },
+
     // Immediate initialization/replay reset; animated reset is camera_reset().
     reset() {
+        cameraMotion.cancel("aggressive");
         this.revision++;
         if (this.animation) this.animation.cancel();
         this.animation = null;
@@ -74,14 +118,17 @@ const camera = {
         this.finished = Promise.resolve();
     },
 
-    directMove(move) {
+    directMove(move, margin = 0) {
         if (!cameraConfig.enabled || !move.camera_directive) return this.finished;
         if (move.camera_directive === "J") {
-            if (cameraConfig.cropWide) return this.to(camera_wide_destination(move.to), cameraConfig.wideDuration);
+            if (cameraConfig.cropWide) return this.to(camera_wide_destination(move.to, margin), cameraConfig.wideDuration);
             return camera_reset();
         }
-        return this.to(camera_focus_destination(move.to, move.camera_directive),
-                       cameraConfig.shots[move.camera_directive].duration);
+        const target = camera_focus_destination(move.to, move.camera_directive, margin);
+        // Extreme rocking may need a wider base to retain the requested local
+        // neighborhood. Only aggressive shots can go below the normal wide zoom.
+        return this.to(target, cameraConfig.shots[move.camera_directive].duration,
+                       margin > 0 ? Math.min(1, target.zoom) : 1);
     },
 
     apply(preset, from, to) {
@@ -107,10 +154,10 @@ function camera_reset() { return camera.to(camera.identity, cameraConfig.wideDur
 
 // Crop layouts retain wide scale but pan just enough to keep the destination
 // square inside the existing transient-safe framing area. Reset stays centered.
-function camera_wide_destination(square) {
+function camera_wide_destination(square, margin = 0) {
     const point = squareToCoords(square);
     const limit = Math.max(0, cameraConfig.viewportSize / 2 -
-        (cameraConfig.transient?.framingMargin || 0) - squareSize / 2);
+        Math.max(margin, cameraConfig.transient?.framingMargin || 0) - squareSize / 2);
     const pan = index => {
         const center = (index - 3.5) * squareSize;
         return Math.max(-limit, Math.min(limit, center)) - center;
@@ -136,7 +183,7 @@ function destination_region(square, shot_type) {
 }
 
 // Absolute destination shot. Source and travel distance intentionally play no role.
-function camera_focus_destination(destination_square, shot_type = "K") {
+function camera_focus_destination(destination_square, shot_type = "K", margin = 0) {
     const shot = cameraConfig.shots[shot_type];
     const region = destination_region(destination_square, shot_type);
     const point = squareToCoords(destination_square);
@@ -153,7 +200,7 @@ function camera_focus_destination(destination_square, shot_type = "K") {
     const minY=Math.min(...ys), maxY=Math.max(...ys);
     // Reserve room for simultaneous bounded transient transforms. LEGACY has a
     // zero margin and therefore preserves the previous destination framing.
-    const limit=cameraConfig.viewportSize/2 - (cameraConfig.transient?.framingMargin || 0);
+    const limit=cameraConfig.viewportSize/2 - Math.max(margin, cameraConfig.transient?.framingMargin || 0);
     // Bound zoom by both the rotated box size and available translation.
     let zoom=Math.min(shot.zoom, cameraConfig.maxZoom,
         2*limit/(maxX-minX), 2*limit/(maxY-minY));
@@ -161,7 +208,7 @@ function camera_focus_destination(destination_square, shot_type = "K") {
         if (value) zoom=Math.min(zoom,(limit+cameraConfig.maxTranslation)/Math.abs(value));
     }
     // Conservative fallback for an oversized configured neighborhood.
-    if (zoom < cameraConfig.wideZoom) return {...camera.identity};
+    if (zoom < cameraConfig.wideZoom && margin === 0) return {...camera.identity};
     const center = (lo,hi) => {
         const ideal=-(lo+hi)*zoom/2;
         const lower=Math.max(-cameraConfig.maxTranslation,-limit-lo*zoom);

@@ -1,9 +1,11 @@
 """Compose the static scene and inline runtime into a portable HTML preview."""
 import json
+from math import hypot, isfinite
 from html import escape
 from pathlib import Path
 from string import Template
 from . import layout
+from .piece_memes import configure_piece_memes
 from .motion import movement_presets
 from .camera import camera_config, CAMERA_OVERSCAN
 from .timing import TIMING_PROFILE, timing_config
@@ -16,17 +18,24 @@ from urllib.parse import quote
 ASSETS = Path(__file__).parent
 RUNTIME_ORDER = ("board", "camera", "camera_impulses", "motion", "choreography", "pieces",
                  "reactions", "effects", "lighting_plan", "particles", "lighting",
-                 "media", "audio", "director", "scheduler", "timeline")
+                 "media", "audio", "piece_memes", "director", "scheduler", "timeline")
 
 
 def render_scene(scene, *, meme_mode="fixed", layout_mode="safe", meme_path=None, meme_volume=0.25,
                  meme_comment_text=None, music_path=None, music_volume=0.8,
                  movement_preset="NORMAL_MOVE", camera_enabled=None,
                  timing_profile=None, choreography_profile=None,
-                 reaction_profile=None, lighting_profile=None, directing_profile='LEGACY'):
+                 reaction_profile=None, lighting_profile=None, directing_profile='LEGACY',
+                 brilliant_mode='standard', aggressive_config=None, very_aggressive_config=None, initial_delay=0.0,
+                 piece_meme_mode="off", piece_memes=None, initial_piece_memes=None):
+    scene, piece_meme_config = configure_piece_memes(scene, piece_meme_mode, piece_memes, initial_piece_memes)
+    if (isinstance(initial_delay, bool) or not isinstance(initial_delay, (int, float))
+            or not isfinite(initial_delay) or not 0 <= initial_delay <= 2_147_483.647):
+        raise ValueError('initial_delay must be finite, non-negative seconds within the browser timer limit')
     if meme_mode not in ("fixed", "off"):
         raise ValueError(f"Unsupported meme mode: {meme_mode!r}; expected 'fixed' or 'off'")
-    directing = directing_config(directing_profile)
+    directing = directing_config(directing_profile, brilliant_mode=brilliant_mode, aggressive=aggressive_config,
+                                 very_aggressive=very_aggressive_config)
     def profile(value, legacy):
         return value if value is not None else ('REFERENCE' if directing['enabled'] else legacy)
     timing_profile = profile(timing_profile, TIMING_PROFILE)
@@ -41,6 +50,8 @@ def render_scene(scene, *, meme_mode="fixed", layout_mode="safe", meme_path=None
     lighting = lighting_config(lighting_profile)
     for event in scene.get("timeline", []):
         move = event.get("move", {})
+        if move.get('brilliant_mode', 'standard') not in {'standard', 'aggressive', 'very_aggressive'}:
+            raise ValueError('Unknown per-move brilliant mode')
         if 'director_tier' in move and move['director_tier'] not in directing['tiers']:
             raise ValueError(f"Unknown director tier: {move['director_tier']}")
         name = move.get("effect_preset", lighting["defaultPreset"])
@@ -100,14 +111,24 @@ def render_scene(scene, *, meme_mode="fixed", layout_mode="safe", meme_path=None
     values.update(board_image=board_image,
                   theme_class='lighting-reference' if lighting['enabled'] else '',
                   LIGHT_CANVAS=theme['canvas'], LIGHT_BACKING=theme['backing'])
+    # A rotation-invariant backing on the outer rocking track covers even tall
+    # portrait viewports. Only the outer track translates this backing; inner
+    # shot/impact transforms cannot move it. Scale is always >= 1 on this owner.
+    radius = hypot(values['VIEWPORT_WIDTH'], values['VIEWPORT_HEIGHT']) / (2 * values['BOARD_SCALE'])
+    shake = directing['aggressive']['shakeTranslation']
+    aggressive_overscan = max(0, radius - values['BOARD_LOGICAL_SIZE'] / 2) + hypot(shake, shake) + 1
+    values.update(AGGRESSIVE_OVERSCAN=aggressive_overscan)
     values.update(CAMERA_OVERSCAN=CAMERA_OVERSCAN, SQUARE_SIZE=layout.BOARD_LOGICAL_SIZE / 8,
                   CAPTION_RIGHT=max(24, layout.MEME_X + layout.MEME_WIDTH -
                                     (layout.CANVAS_WIDTH - layout.RIGHT_UI_SAFE_AREA)),
                   meme_layer=meme_layer, music_audio=music_audio)
     data = {"scene": scene,
+            "pieceMemeConfig": piece_meme_config,
+            "playbackConfig": {"initialDelayMs": initial_delay * 1000},
             "directingConfig": directing,
             "cameraConfig": camera_config(camera_enabled, timing_profile,
-                                          viewport_size=camera_viewport),
+                                          viewport_size=camera_viewport,
+                                          aggressive=directing["aggressive"]),
             "timingConfig": timing_config(timing_profile),
             "choreographyConfig": choreography,
             "reactionConfig": reactions,
@@ -131,12 +152,13 @@ const hasMemeTriggers = timeline.some(event =>
 """
     runtime += "\n" + "\n".join((ASSETS / (name + ".js")).read_text() for name in RUNTIME_ORDER)
     runtime += "\ncamera.reset();\ncameraMotion.reset();\ncreatePieces();\n"
+    runtime += "if (pieceMemeConfig.initial) pieceMemeSystem.prepare().then(()=>pieceMemeSystem.initialize()).catch(console.error);\n"
     values["runtime"] = runtime
     # Keep scene.css valid standalone CSS; inject computed layout as custom properties.
     pixel_properties = (
         "CANVAS_WIDTH", "CANVAS_HEIGHT", "FRAME_X", "FRAME_Y",
         "VIEWPORT_WIDTH", "VIEWPORT_HEIGHT", "BOARD_OFFSET_X", "BOARD_OFFSET_Y",
-        "BOARD_LOGICAL_SIZE", "CAMERA_OVERSCAN", "SQUARE_SIZE",
+        "BOARD_LOGICAL_SIZE", "CAMERA_OVERSCAN", "AGGRESSIVE_OVERSCAN", "SQUARE_SIZE",
         "MEME_X", "MEME_Y", "MEME_WIDTH", "MEME_HEIGHT", "CAPTION_RIGHT",
     )
     css_properties = {
